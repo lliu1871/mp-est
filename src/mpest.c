@@ -84,13 +84,16 @@ int main (int argc, char *argv[])
 	time_t t;
 	struct tm *current;
 	char genetreefile[LSPNAME], speciesname[NTAXA][LSPNAME], name[LSPNAME];
-	char outfile[LSPNAME], outputfile[LSPNAME], outputfile1[LSPNAME], outputfile2[LSPNAME];
+	char outfile[100], outputfile[100], outputfile1[100], outputfile2[100];
 
     PrintHeader();
 	
     /*read the control file*/
 	fin = (FILE*)gfopen(argv[1],"r");
-	fscanf(fin,"%s%d%ld%d%d%d", genetreefile, &distance, &seed, &nruns, &ngene, &(sptree.ntaxa));
+	if(fscanf(fin,"%s%d%ld%d%d%d", genetreefile, &distance, &seed, &nruns, &ngene, &(sptree.ntaxa))!=6){
+			printf("There are something wrong in the control file\n");
+			return(ERROR);
+	}
 	sprintf(outfile, "%s_besttree.tre", genetreefile);
     sprintf(outputfile, "%s_output.tre", genetreefile);
 	sprintf(outputfile1, "%s_genetree.triple", genetreefile);
@@ -119,10 +122,16 @@ int main (int argc, char *argv[])
     totaltaxa = 0;
 	for(i=0; i<sptree.ntaxa; i++)
 	{
-        fscanf(fin,"%s%d", speciesname[i], &n);
+        if(fscanf(fin,"%s%d", speciesname[i], &n) != 2){
+				printf("There are something wrong in the control file\n");
+				return(ERROR);
+		}
 		for(j=0; j<n; j++)
 		{
-			fscanf(fin,"%s", taxanames[totaltaxa]);	
+			if(fscanf(fin,"%s", taxanames[totaltaxa]) != 1){
+				printf("There are something wrong in the control file\n");
+				return(ERROR);
+			}	
 			/*defines the species number that each taxon belongs to*/ 
 			taxanodenumber[totaltaxa++] = i;
 		}
@@ -139,7 +148,11 @@ int main (int argc, char *argv[])
     usertree=3: calculate likelihood score for a fixed tree
     usertree=4: 
     ****************************************************************************************/
-	fscanf(fin,"%d", &usertree);
+	if(fscanf(fin,"%d", &usertree) != 1){
+		printf("There are something wrong in the control file\n");
+		return(ERROR);
+	}	
+	
 	if(usertree > 0){
 		if(ReadaTree(fin, &sptree)== ERROR) {printf("Something is wrong with the user tree; It must be a rooted binary tree.\n");exit(-1);}
         
@@ -171,31 +184,31 @@ int main (int argc, char *argv[])
         /* read the taxa whose placements need to be updata*/	
         if(usertree == 4) 
 	    {
-		      fscanf(fin,"%d", &numupdatenodes);
-		      for(j=0; j<numupdatenodes; j++)
-		      {
- 			        fscanf(fin,"%s",name);
-			        for(k=0;k<sptree.ntaxa;k++)
-			        {
-				            if(strcmp(name,sptree.nodes[k].taxaname)==0)
-                        	{
-                            		updatenodes[j] = k;
-                            		break;
-                        	}
-			         }
-			         printf("%d \n",updatenodes[j]);
-			         if(k == sptree.ntaxa)
-			         {
-				        printf("the taxa in the species tree do not have the update taxon %s\n",name);
-				        exit(-1);
-			         }
-		      }
-		      for(j=0;j<2*sptree.ntaxa-1;j++) if(sptree.nodes[j].brlens>0) sptree.nodes[j].brlens = 0.5;
-	    }	
-        
+			if(fscanf(fin,"%d", &numupdatenodes) != 1){
+				printf("There are something wrong in the control file\n");
+				return(ERROR);
+			}	
+			for(j=0; j<numupdatenodes; j++){
+				if(fscanf(fin,"%s",name) != 1){
+					printf("There are something wrong in the control file\n");
+					return(ERROR);
+				}	
+				for(k=0;k<sptree.ntaxa;k++){
+					if(strcmp(name,sptree.nodes[k].taxaname)==0){
+						updatenodes[j] = k;
+						break;
+					}
+				}
+				printf("%d \n",updatenodes[j]);
+				if(k == sptree.ntaxa){
+					printf("the taxa in the species tree do not have the update taxon %s\n",name);
+					exit(-1);
+				}
+			}
+			for(j=0;j<2*sptree.ntaxa-1;j++) if(sptree.nodes[j].brlens>0) sptree.nodes[j].brlens = 0.5;
+		}	    
 	}else{
-        for(i=0; i<sptree.ntaxa; i++)
-        {
+        for(i=0; i<sptree.ntaxa; i++){
             strcpy(sptree.nodes[i].taxaname, speciesname[i]);
         }
     }
@@ -1261,7 +1274,8 @@ int ReadaTree (FILE *fTree,Tree *tree)
          		cfather=cnode;
       		}
       		else if (ch==')') { level--;  inodeb=cfather; cfather=tree->nodes[cfather].father; }
-      		else if (ch==':') fscanf(fTree,"%lf",&tree->nodes[inodeb].brlens);
+      		else if (ch==':') {if(fscanf(fTree,"%lf",&tree->nodes[inodeb].brlens) != 1){printf("There are something wrong in ReadaTree\n");
+			return(ERROR);}}	
       		else if (ch==',') ;
       		else if (ch==';' && level!=0) 
          	{
@@ -1271,7 +1285,10 @@ int ReadaTree (FILE *fTree,Tree *tree)
       		else if (isdigit(ch))
       		{ 
          		ungetc(ch, fTree); 
-         		fscanf(fTree,"%d",&inodeb); 
+         		if(fscanf(fTree,"%d",&inodeb)!=1){
+					printf("There are something wrong in ReadaTree\n");
+					return(ERROR);
+				}	
          		inodeb--;
          		tree->nodes[inodeb].father=cfather;
          		tree->nodes[cfather].sons[tree->nodes[cfather].nson++]=inodeb;
@@ -1296,7 +1313,8 @@ int ReadaTree (FILE *fTree,Tree *tree)
    
    	for ( ; ; ) {
       		while(isspace(ch=fgetc(fTree)) && ch!=';' );
-      		if (ch==':')       fscanf(fTree, "%lf", &tree->nodes[tree->root].brlens);
+      		if (ch==':') {if(fscanf(fTree, "%lf", &tree->nodes[tree->root].brlens)!=1){printf("There are something wrong in ReadaTree\n");
+			return(ERROR);}	}
       		else if (ch==';')  break;
       		else  { ungetc(ch,fTree);  break; }
    	}
