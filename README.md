@@ -3,7 +3,7 @@ This program is free software; you can redistribute it and/or modify it under th
 
 MP-EST estimates species trees from a set of gene trees by maximizing a pseudo-likelihood function. The input data of MP-EST are rooted binary gene trees produced by the maximum likelihood phylogenetic programs RAxML, PHYML, PHYLIP, and PAUP etc. In addition to the gene tree file, a control file must be generated for running MP-EST. The control file contains necessary parameters for running MP-EST.
 
-##New features in version 2.1
+## New features in version 2.1
 Parallel computing using PTHREAD is available in version 2.0. Set PTHREAD ?= yes in Makefile
 The constraints on the birth rate parameter lambda in the old versions are removed in version 2.0
 The birth-death probability is calculated using two formulas - one for alpha < 0.5 and another for alpha > 0.5 where alpha = lambda*brlens / (1+lambda*brlens)
@@ -13,10 +13,10 @@ The second column "NUMBER" is removed in the data file
 Compile from source code
 To compile the program from source code, type make and hit return under the directory src.
 
-Run the program
+## Run the program
 ./begfe controlfile
 
-Example control files
+## Example control files
 Three control files are included in the package. The control file controlsim is used to simulate gene family data.
 
 A control file for simulating gene family data (controlsim)
@@ -70,14 +70,14 @@ AnolisMHCtab.txt #input file
 
 1000000 1000 0 #number of MCMC generations, save every 100 samples, 0:unlinked (variable) lambdas and 1:linked (single) lambda
 
-Ouput files
+## Ouput files
 There are two output files; sim1.out and sim1.pvalue. The MCMC output for all parameters is saved in sim1.out. Each column in sim.out represents the posterior distribution of a particular parameter in the birth and death model. The parameters such as the birth and death rate are estimated by the Bayesian means, i.e., the averages of the columns after discarding the burn-in period.
 
 The Bayesian p-values (PPP) for all gene families in the dataset are saved in sim1.pvalue. The average of a column in sim1.pvalue is the Bayesian p-values for a particular gene family. Of course, the burn-in period must be discarded.
 
-Citation
+## Citation
 Liu, L., L. Yu, S.V. Edwards. A maximum pseudo-likelihood approach for estimating species trees under the coalescent model. BMC Evol. Biol. 2010, 10:302.
 
 
-Old versions
+## Old versions
 Old versions BEGFE are available at https://github.com/lliu1871/oldversion
