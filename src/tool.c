@@ -1,6 +1,5 @@
 #include "mpest.h"
 
-
 FILE *gfopen(char *filename, char *mode)
 {
    FILE *fp=(FILE*)fopen(filename, mode);
@@ -11,24 +10,12 @@ FILE *gfopen(char *filename, char *mode)
    return(fp);
 }
 
-
-
-
-void error2 (char * message)
-{ printf("\nError: %s.\n", message); exit(-1); }
-
-
 static time_t time_start;
-void starttime (void)
-{  
+void starttime (void){  
    time_start=time(NULL);
 }
 
-
-
-
-void strcase (char *str, int direction)
-{
+void strcase (char *str, int direction){
 /* direction = 0: to lower; 1: to upper */
    char *p=str;
    if(direction)  while(*p) { *p=(char)toupper(*p); p++; }
@@ -36,80 +23,123 @@ void strcase (char *str, int direction)
 }
 
 
-int matIout (FILE *fout, int x[], int n, int m)
-{
-   int i,j;
-   for (i=0,FPN(fout); i<n; i++,FPN(fout)) 
-      FOR(j,m) fprintf(fout,"%6d", x[i*m+j]);
-   return (0);
+void Print (char *format, ...){
+	va_list  ptr;
+	va_start (ptr, format);
+	vprintf (format, ptr);
+	fflush (stdout);
+	va_end (ptr);
 }
 
+
+#define TARGETLENDELTA (100)
+
+int SaveSprintf(char **target, int *targetLen, char *fmt, ...) {
+  va_list    argp;
+  int        len, retval;
+
+  va_start(argp, fmt);
+
+#ifdef VISUAL
+  len = _vsnprintf(NULL, 0, fmt, argp);
+#else
+  len = vsnprintf(NULL, 0, fmt, argp);
+#endif
+
+  va_end(argp);
+
+  if(len > *targetLen)
+        {
+/*        fprintf(stderr, "* increasing buffer from %d to %d bytes\n", *targetLen, len+TARGETLENDELTA); */
+        *targetLen = len+TARGETLENDELTA; /* make it a little bigger */
+            *target = realloc(*target, *targetLen);
+        }
+
+  va_start(argp,fmt);
+  retval=vsprintf(*target, fmt, argp);
+  va_end(argp);
+
+/*   fprintf(stderr, "* savesprintf /%s/\n",*target); */
+  return retval;
+}
+
+int AddToPrintString (char *tempStr){
+	size_t len1, len2;
+
+	len1 = (int) strlen(printString);
+	len2 = (int) strlen(tempStr);
+	if (len1 + len2 + 5 > printStringSize){
+		printStringSize += len1 + len2 - printStringSize + 200;
+		printString = realloc((void *)printString, printStringSize * sizeof(char));
+		if (!printString){
+			Print ("Problem reallocating printString (%d)\n", printStringSize * sizeof(char));
+			return ERROR;
+		}
+	}
+	strcat(printString, tempStr);
+
+	return NO_ERROR;
+}
+
+/*Find the numbers of taxa for all trees in a tree file*/
+int FindNtaxa(FILE *fTree, int *ntaxa, int ngene){ 
+	char ch;
+	int ncomma, i=0;
+
+	ch = fgetc (fTree);
+	while (ch != EOF) {
+      	ch = fgetc (fTree);
+		ncomma = 0;
+		while (ch != ';' && ch != EOF){
+			ch = fgetc (fTree);
+			if(ch == ','){
+				ncomma++;
+			}		
+		}
+
+      	if(ch == ';'){
+			ntaxa[i] = ncomma + 1;
+        	i++;
+		}
+
+		if(i == ngene){
+			break;
+		}
+	}
+
+	if(i < ngene){
+		printf("Check on the number of gene trees in the control file. There are only %d gene trees in the tree file!\n", i);
+		return ERROR;
+	}
+
+	rewind(fTree);
+	return NO_ERROR;
+}
 
 /*///////////////////////////////////////////*/
 /*      math function                       */
 /*/////////////////////////////////////////*/
-long factorial(int n)
-{
+long factorial(int n){
    long f, i;
-   if (n>10) error2("n>10 in factorial");
+   if (n>10) printf("n>10 in factorial");
    for (i=2,f=1; i<=(long)n; i++) f*=i;
    return (f);
 }
 
 
-
-
-static unsigned int z_rndu=137;
-static unsigned int w_rndu=123456757;
-
-
-void SetSeed (unsigned int seed)
-{
-   if(sizeof(int)-4) puts("oh-oh, we are in trouble.  int not 32-bit?");
-   z_rndu=170*(seed%178)+137;
-   w_rndu = seed*127773;
+void SetSeed (unsigned int seed){
+   srand(seed);
 }
 
-
-
-
-double rndu (void)
-{
-/* U(0,1): AS 183: Appl. Stat. 31:188-190 
-   Wichmann BA & Hill ID.  1982.  An efficient and portable
-   pseudo-random number generator.  Appl. Stat. 31:188-190
-
-
-   x, y, z are any numbers in the range 1-30000.  Integer operation up
-   to 30323 required.
-*/
-   static unsigned int x_rndu=11, y_rndu=23;
-   double r;
-   
-
-
-  
-   x_rndu = 171*(x_rndu%177) -  2*(x_rndu/177);
-   y_rndu = 172*(y_rndu%176) - 35*(y_rndu/176);
-   z_rndu = 170*(z_rndu%178) - 63*(z_rndu/178);
-/*
-   if (x_rndu<0) x_rndu+=30269;
-   if (y_rndu<0) y_rndu+=30307;
-   if (z_rndu<0) z_rndu+=30323;
-*/
-  r = x_rndu/30269.0 + y_rndu/30307.0 + z_rndu/30323.0;
-
-
-  return (r-(int)r);
+double rndu (void){
+	return (double)rand() / (double)((unsigned)RAND_MAX + 1);
 }
-
 
 double rndgamma1 (double s);
 double rndgamma2 (double s);
 
 
-double rndgamma (double s)
-{
+double rndgamma (double s){
 /* random standard gamma (Mean=Var=s,  with shape parameter=s, scale para=1)
       r^(s-1)*exp(-r)
    J. Dagpunar (1988) Principles of random variate generation,
@@ -119,7 +149,6 @@ double rndgamma (double s)
            exponential if s=1
 */
    double r=0;
-
 
    if (s<=0)      puts ("jgl gamma..");
    else if (s<1)  r=rndgamma1 (s);
@@ -185,14 +214,6 @@ double rndgamma2 (double s)
    }
    return (x);
 }
-
-
-int comparedouble (const void *a, const void *b)
-{  
-   double aa = *(double*)a, bb= *(double*)b;
-   return (aa==bb ? 0 : aa > bb ? 1 : -1);
-}
-
 
 double IncompleteGamma (double x, double alpha, double ln_gamma_alpha)
 {
@@ -274,10 +295,10 @@ double LnGamma (double x)
       lng=log((double)factorial(nx));
    else {
       if(x<=0) {
-         error2("lnGamma not implemented for x<0");
+         printf("lnGamma not implemented for x<0");
          if((int)x-x==0) { puts("lnGamma undefined"); return(-1); }
          for (fneg=1; x<0; x++) fneg/=x;
-         if(fneg<0) error2("strange!! check lngamma");
+         if(fneg<0) printf("strange!! check lngamma");
          fneg=log(fneg);
       }
       if (x<7) {
