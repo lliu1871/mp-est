@@ -1,12 +1,9 @@
-# mp-est
-
-
 # MP-EST (v2.1): Maximum Pseudo-likelihood Estimation of Species Trees
 This program is free software; you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation; either version 2 of the License, or (at your option) any later version.
 
 MP-EST estimates species trees from a set of gene trees by maximizing a pseudo-likelihood function. The input data of MP-EST are rooted binary gene trees produced by the maximum likelihood phylogenetic programs RAxML, PHYML, PHYLIP, and PAUP etc. In addition to the gene tree file, a control file must be generated for running MP-EST. The control file contains necessary parameters for running MP-EST.
 
-New features in version 2.1
+##New features in version 2.1
 Parallel computing using PTHREAD is available in version 2.0. Set PTHREAD ?= yes in Makefile
 The constraints on the birth rate parameter lambda in the old versions are removed in version 2.0
 The birth-death probability is calculated using two formulas - one for alpha < 0.5 and another for alpha > 0.5 where alpha = lambda*brlens / (1+lambda*brlens)
