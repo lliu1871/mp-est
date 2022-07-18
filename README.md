@@ -1,7 +1,7 @@
 # MP-EST (v2.1): Maximum Pseudo-likelihood Estimation of Species Trees
 This program is free software; you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation; either version 2 of the License, or (at your option) any later version.
 
-MP-EST estimates species trees from a set of gene trees by maximizing a pseudo-likelihood function. The input data of MP-EST are rooted gene trees. In addition to the gene tree file, a control file must be generated for running MP-EST. The control file contains necessary parameters for running MP-EST.
+MP-EST estimates species trees (topology and branch lengths in coalescent units) from a set of gene trees by maximizing a pseudo-likelihood function. The input data of MP-EST are rooted gene trees. In addition to the gene tree file, a control file must be generated for running MP-EST. The control file contains necessary parameters for running MP-EST.
 
 ## New features in version 2.1
 
