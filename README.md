@@ -46,4 +46,4 @@ Liu, L., L. Yu, S.V. Edwards. A maximum pseudo-likelihood approach for estimatin
 
 
 ## Old versions
-Old versions BEGFE are available at https://github.com/lliu1871/oldversion
+Old versions MP-EST are available at https://github.com/lliu1871/oldversion
