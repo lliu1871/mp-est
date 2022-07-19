@@ -24,16 +24,27 @@ Example control files are included in the example folder.
 A control file for building the MPEST tree (control)
 
 testgenetree #gene tree file
+
 0   #0:running mp-est, 1: calculating triplet distances, 2: converting short branches to polytomies
+
 -1  # seed, -1: a random seed
+
 2   # the number of runs
+
 100 5 #the number of genes and the number of species
+
 A 1 A #species-allele table
+
 B 1 B
+
 C 1 C
+
 D 1 D
+
 E 1 E
+
 0 #0:no user tree, 1: the user tree is used as the start tree in the algorithm
+
 (E:0.002217212018,((C:0.001601580862,(A:0.0007794028167,B:0.001370162343):0.0004631267076):0.0003658417881,D:0.001319072462):0.0003568793102); #user tree
 
 
