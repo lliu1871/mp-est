@@ -16,7 +16,7 @@ MP-EST estimates species trees (topology and branch lengths in coalescent units)
 To compile the program from source code, type make and hit return under the directory src.
 
 ## Run the program
-./begfe controlfile
+./mpest controlfile
 
 ## Example control files
 Example control files are included in the example folder. 
