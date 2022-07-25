@@ -1282,6 +1282,8 @@ int ReadaTree (FILE *fTree, Tree *tree){
 				tree->nodes[taxa].taxaname[index++] = ch;
 				ch = treestring[++i];
 			}
+			/*add the null character at the end of the string*/
+			tree->nodes[taxa].taxaname[index] = '\0';
 			i--;
 			tree->nodes[taxa].father = cfather;
 			tree->nodes[cfather].sons[tree->nodes[cfather].nson++] = taxa;
