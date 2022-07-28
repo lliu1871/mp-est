@@ -79,9 +79,10 @@ int		    numupdatenodes;
 int			numGenes;
 int		    updatenodes[NTAXA];
 int 		postorderindex = 0;
+int			calculatedistance = 0;
 
 int main (int argc, char *argv[]){
-	int i, j, k, n, ngene, distance, ntriples; 
+	int i, j, k, n, ngene, ntriples; 
 	FILE *fin, *fbesttree, *foutputtree;
 	time_t t;
 	struct tm *current;
@@ -92,25 +93,25 @@ int main (int argc, char *argv[]){
 	
     /*read the control file*/
 	fin = (FILE*)gfopen(argv[1],"r");
-	if(fscanf(fin,"%s%d%ld%d%d%d", genetreefile, &distance, &seed, &nruns, &ngene, &(sptree.ntaxa)) != 6){
+	if(fscanf(fin,"%s%d%ld%d%d%d", genetreefile, &calculatedistance, &seed, &nruns, &ngene, &(sptree.ntaxa)) != 6){
 			printf("Errors in the control file\n");
 			return ERROR;
 	}
 	numGenes = ngene; /*this needs to be fixed*/
 		
 	/*output files*/
-	if(distance == 0){
+	if(calculatedistance == 0){
 		sprintf(besttreefile, "%s_besttree.tre", genetreefile);
     	sprintf(outputtreefile, "%s_output.tre", genetreefile);
 		fbesttree = (FILE*)gfopen(besttreefile,"w");
     	foutputtree = (FILE*)gfopen(outputtreefile,"w");
-	}else if (distance == 1){
+	}else if (calculatedistance == 1){
 		sprintf(besttreefile, "%s_genetree.triple", genetreefile);
 		sprintf(outputtreefile, "%s_genetree.triple.dis", genetreefile);
-	}else if (distance == 2){
+	}else if (calculatedistance == 2){
 		sprintf(besttreefile, "%s_genetree.quartet", genetreefile);
 		sprintf(outputtreefile, "%s_genetree.quartet.dis", genetreefile);
-	}else if(distance ==3){
+	}else if(calculatedistance ==3){
 		sprintf(besttreefile, "%s_genetree.partition", genetreefile);
 	}else{
 		sprintf(outputtreefile, "%s_collapse.tre", genetreefile);
@@ -230,7 +231,7 @@ int main (int argc, char *argv[]){
 	/************************************************************************
 	*	 Algorithm for triple distance                                      *
 	************************************************************************/
-	if(distance == 1){
+	if(calculatedistance == 1){
 		/*calculate triples*/
 		TriplesList(genetreefile, besttreefile, ngene);
 
@@ -240,7 +241,7 @@ int main (int argc, char *argv[]){
 		return NO_ERROR;
 	}
 
-	if(distance == 2){
+	if(calculatedistance == 2){
 		/*calculate quartets*/
 		QuartetsList(genetreefile, besttreefile, ngene);
 
@@ -250,7 +251,7 @@ int main (int argc, char *argv[]){
 		return NO_ERROR;
 	}
 
-	if(distance == 3){
+	if(calculatedistance == 3){
 		/*calculate quartets*/
 		GenetreePartitions(genetreefile, besttreefile, ngene);
 		return NO_ERROR;
@@ -328,7 +329,7 @@ int GenetreePartitions (char *treefile, char *outfile, int ntrees){
 	/*find gene tree partitions*/
 	for(i=0; i<ntrees; i++){
 		if(ReadaTree(fTree, &genetree) == ERROR) {
-			printf("Errors in the gene tree %d; It must be a rooted binary tree.\n", i+1);
+			printf("Errors in the gene tree %d.\n", i+1);
 			return ERROR;
 		}
 
@@ -443,7 +444,7 @@ int SptreePartitionSupport (char *genetreefile){
 	/*find gene tree partitions*/
 	for(i=0; i<numGenes; i++){
 		if(ReadaTree(fTree, &genetree) == ERROR) {
-			printf("Errors in the gene tree %d; It must be a rooted binary tree.\n", i+1);
+			printf("Errors in the gene tree %d.\n", i+1);
 			return ERROR;
 		}
 
@@ -1226,7 +1227,7 @@ int TriplesFreq (char *treefile, int ngene){
 	/*find gene tree triples*/
 	for(i=0; i<ngene; i++){
 		if(ReadaTree(fTree, &genetree) == ERROR) {
-			printf("Errors in the gene tree %d; It must be a rooted binary tree.\n",i+1);
+			printf("Errors in the gene tree %d; It must be a rooted tree.\n",i+1);
 			return ERROR;
 		}
 
@@ -1265,7 +1266,7 @@ int TriplesFreq (char *treefile, int ngene){
 }
 
 void PrintHeader (void){
-	Print ("\n\n\n\n%s            Maximum Pseudo-likelihood Estimation of Species Trees (MPEST_2.1)  \n\n", spacer);
+	Print ("\n\n\n\n%s            Maximum Pseudo-likelihood Estimation of Species Trees (MPEST_v2.1)  \n\n", spacer);
 	Print ("%s                                   by\n\n", spacer);
 	Print ("%s                                Liang Liu\n\n", spacer);
 	Print ("%s                        Department of Statistics\n", spacer);
@@ -1809,13 +1810,13 @@ int ReadaTree (FILE *fTree, Tree *tree){
 		printf("%s %s %d %d\n", tree->nodes[0].taxaname, tree->nodes[1].taxaname, tree->isrooted, tree->root);	
 		PrintTree (tree, tree->root, 1, 1, 0, 0, 1);
 		printf("%s", printString);		
-		exit(-1);
+		return ERROR;
 	}
 
 	
-	if(!tree->isrooted){
-		printf("This is not a rooted tree!\n");
-		//return ERROR; review
+	if((!tree->isrooted) && (calculatedistance == 0 || calculatedistance == 1)){
+		printf("This gene tree is not a rooted tree!\n");
+		return ERROR;
 	}
 
 	/*create postorder tree traversal*/
@@ -2130,7 +2131,7 @@ int QuartetsList (char *treefile, char *outfile, int ntrees){
 	/*find gene tree quartet*/
 	for(i=0; i<ntrees; i++){
 		if(ReadaTree(fTree, &genetree) == ERROR) {
-			printf("Errors in the gene tree %d; It must be a rooted binary tree.\n", i+1);
+			printf("Errors in the gene tree %d; It must be a rooted tree.\n", i+1);
 			return ERROR;
 		}
 
@@ -2212,7 +2213,7 @@ int TriplesList (char *treefile, char *outfile, int ntrees){
 	/*find gene tree triples*/
 	for(i=0; i<ntrees; i++){
 		if(ReadaTree(fTree, &genetree) == ERROR) {
-			printf("Errors in the gene tree %d; It must be a rooted binary tree.\n", i+1);
+			printf("Errors in the gene tree %d; It must be a rooted tree.\n", i+1);
 			return ERROR;
 		}
 
