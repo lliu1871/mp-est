@@ -31,7 +31,7 @@ A control file for building the MPEST tree (control)
 
 testgenetree #gene tree file
 
-0   #0:running mp-est, 1: calculating triplet distances, 2: converting short branches to polytomies
+0   #0:running mp-est, 1: calculating triplet distances, 2: converting short branches to polytomies, 3: calculating quartet distances, 4: calculating gene tree partitions
 
 -1  # seed, -1: a random seed
 
