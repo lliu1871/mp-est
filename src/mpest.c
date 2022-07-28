@@ -1858,7 +1858,7 @@ int PrintTree (Tree *tree, int inode, int showName, int showBrlens, int showThet
 	WriteTreeToFile (tree, tree->root, showName, showBrlens, showTheta, showSupport, isRooted);
 
 	if(showSupport == YES) 
-		SaveSprintf (&tempStr, &tempStrSize,")[&support=%.2f]", tree->nodes[tree->root].support);
+		SaveSprintf (&tempStr, &tempStrSize,")[&concordance=%.2f]", tree->nodes[tree->root].support);
 	else 
 		SaveSprintf (&tempStr, &tempStrSize,")");
 
@@ -1967,7 +1967,7 @@ void WriteTreeToFile (Tree *tree, int inode, int showName, int showBrlens, int s
 		
 			if (isRooted == YES) /*tree->nodes[inode].father != tree->root)*/{
 				if(tree->nodes[inode].support>0 && showSupport == YES){
-					SaveSprintf (&tempStr, &tempStrSize,"[&support=%.2f]", tree->nodes[inode].support);
+					SaveSprintf (&tempStr, &tempStrSize,"[&concordance=%.2f]", tree->nodes[inode].support);
 					AddToPrintString (tempStr);
 				}
 				if(tree->nodes[inode].brlens>0 && showBrlens == YES){
