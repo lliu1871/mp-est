@@ -11,6 +11,12 @@ MP-EST estimates species trees (topology and branch lengths in coalescent units)
 
 3. The program can convert short branches (<1e-06) to polytomies in the gene trees.
 
+4. The program can calculate triplet distances among gene trees
+
+5. The program can calculate quartet distances among gene trees
+
+6. The program outputs the species tree gene tree concordance scores for each internal node of the MP-EST tree.
+
 
 ## Compile from source code
 To compile the program from source code, type make and hit return under the directory src.
