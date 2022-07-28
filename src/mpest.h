@@ -10,7 +10,7 @@
 #include <sys/time.h>
 
 #define MAX_STRING_LENGTH 10000 /*max length of a string*/
-#define NTAXA         400      /* max # of species */
+#define NTAXA         100      /* max # of species */
 #define MAXROUND	10000000		/* MAX # OF ROUNDS*/
 #define NUM_NOCHANGE	20000		/* # OF ROUNDS THAT NO BIGGER LIKELIHOOD VALUES ARE FOUND*/
 #define LSPNAME       60       /* # characters in sequence names */
@@ -29,7 +29,7 @@ typedef struct node
 	{
 	int father, nson, sons[NTAXA], namenumber;
 	char taxaname[LSPNAME];
-	double brlens, theta;
+	double brlens, theta, support;
    	}
 	Treenode;
 
@@ -39,6 +39,8 @@ typedef struct Tree
 	int ntaxa;
 	int isrooted; 
 	int numnodes;
+	int postorder[2*NTAXA];
+	int preorder[2*NTAXA];	
    	Treenode nodes[2*NTAXA];
 	}  
 	Tree;
