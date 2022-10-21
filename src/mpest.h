@@ -46,8 +46,8 @@ typedef struct Tree
 	Tree;
 
 /*global variables*/
-char		*printString;                /* string for printing to a file                */
-size_t		printStringSize;             /* length of printString                        */
+extern char		*printString;                /* string for printing to a file                */
+extern size_t		printStringSize;             /* length of printString                        */
 
 /* tool functions*/
 FILE *gfopen(char *filename, char *mode);

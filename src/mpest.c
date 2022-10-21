@@ -64,8 +64,12 @@ int 		TriplesList (char *treefile, char *outfile, int ntrees);
 void 		WriteTreeToFile (Tree *tree, int inode, int showName, int showBrlens, int showTheta, int showSupport, int isRooted);
 void		WritePhylipTreeToFile (Tree *tree, int inode, int showBrlens, int showTheta, int isRooted);
 
+
+/*global variables*/
+char            *printString;      /* string for printing to a file  */
+size_t          printStringSize;   /* length of printString   */
 Tree 		sptree;
-int		    **triplematrix; /*store the frequency of gene tree triples*/ 
+int		**triplematrix; /*store the frequency of gene tree triples*/ 
 char		spacer[10]="  ";
 long int	seed = -1;
 int 		usertree=0;		/* 1: use the usertree as the starting tree */
@@ -2076,7 +2080,9 @@ int QuartetDistance (char *quartetfile, char *outfile, int ntrees){
 	foutfile = (FILE*)gfopen(outfile,"w");
 
 	for(i=0; i<ntrees; i++){
-		fscanf(fQuartet, "%s%s", treenames[i], quartetstring[i]);
+		if(fscanf(fQuartet, "%s%s", treenames[i], quartetstring[i]) != 2){
+			return ERROR;
+		}
 	}
 
 	/*triple distance*/
@@ -2293,7 +2299,9 @@ int TripleDistance (char *triplefile, char *outfile, int ntrees){
 	foutfile = (FILE*)gfopen(outfile,"w");
 
 	for(i=0; i<ntrees; i++){
-		fscanf(fTriple, "%s%s", treenames[i], triplestring[i]);
+		if(fscanf(fTriple, "%s%s", treenames[i], triplestring[i]) != 2){
+			return ERROR;
+		}
 	}
 
 	/*triple distance*/
