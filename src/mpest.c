@@ -929,7 +929,10 @@ int PrintState (int round, FILE *outfile, int addend){
 			}
 			fprintf(outfile,"    %d %s;\n", sptree.ntaxa, sptree.nodes[sptree.ntaxa-1].taxaname);
         }else{
-			SptreePartitionSupport (genetreefile);
+			/*calculate gene tree frequencies for 1 allele per species*/
+			if(totaltaxa == sptree.ntaxa){
+				SptreePartitionSupport (genetreefile);
+			}
 			if (PrintTree(&sptree, sptree.root, 0, 1, 0, 1, 1) == ERROR){
 				printf("Errors in printtree!\n");
 				return ERROR;
