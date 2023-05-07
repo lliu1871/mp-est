@@ -27,11 +27,6 @@ To compile the program from source code, type make and hit return under the dire
 ## Help
 ./mpest -h
 
-Maximum Pseudo-likelihood Estimation of Species Trees - MPEST\
-Version 3.0\
-(c) Copyright, 2014-2024 Liang Liu\
-Department of Statistics, University of Georgia\
-
 Usage: mpest [-i inputfile] [-n #] [-s #] [-u NAME] [-h] [-B|-C|-L|-N|-P|-Q|-T|] \
   -i: NAME = name of input file in nexus format. Input gene trees must be rooted; polytomy trees are allowed.\
   -n: # = number of runs [default = 1].\
