@@ -1,0 +1,20 @@
+#Nexus
+[This analysis was conducted at local time 09:54AM on 05-09-2023 with seed = 33868.
+The branch length 1.0 of the external branches is arbitrary because mp-est does not
+estimate the lengths of the external branches. If the internal branch length is 7.0,
+it indicates that all gene trees support the species tree triple. In the output.tre file,
+the tree block contains the output trees (and their likelihood scores) generated from the algorithm,
+while the besttree.tre file contains the final mpest tree. If multiple runs are specified,
+the besttree.tre file contains multiple mpest trees generated from multiple runs.
+Choose the tree with the maximum likelihood score as the estimate of the species tree.]
+
+Begin trees;
+  translate
+    1 A,
+    2 B,
+    3 C,
+    4 D,
+    5 E;
+  tree mpest [-1294.589813] = (5:1.00,(4:1.00,(3:1.00,(1:1.00,2:1.00)[&concordance=0.90]:1.89)[&concordance=0.89]:1.87)[&concordance=1.00]:7.00)[&concordance=1.00];
+end;
+
