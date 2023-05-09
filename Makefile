@@ -14,7 +14,7 @@ $(info $$CC is [${CC}])
 
 CFLAGS=-DUNIX_VERSION -O3 -Wall -Wno-uninitialized
 LDFLAGS= -lm
-INCLUDES=src/mpest.o src/tool.o
+INCLUDES=src/mpest.o src/tool.o src/neighbour_joining.o
 # Compile options
 
 $(TARGET): $(INCLUDES)

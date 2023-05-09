@@ -1,5 +1,5 @@
 #Nexus
-[This analysis was conducted at local time 03:53PM on 04-26-2023 with seed = 9381.
+[This analysis was conducted at local time 09:54AM on 05-09-2023 with seed = 33868.
 The branch length 1.0 of the external branches is arbitrary because mp-est does not
 estimate the lengths of the external branches. If the internal branch length is 7.0,
 it indicates that all gene trees support the species tree triple. In the output.tre file,
@@ -15,6 +15,6 @@ Begin trees;
     3 C,
     4 D,
     5 E;
-  tree mpest [-100.790722] = (5:1.00,(4:1.00,(3:1.00,(1:1.00,2:1.00)[&concordance=0.94]:2.52)[&concordance=0.91]:2.04)[&concordance=1.00]:7.00)[&concordance=1.00];
+  tree mpest [-1294.589813] = (5:1.00,(4:1.00,(3:1.00,(1:1.00,2:1.00)[&concordance=0.90]:1.89)[&concordance=0.89]:1.87)[&concordance=1.00]:7.00)[&concordance=1.00];
 end;
 
