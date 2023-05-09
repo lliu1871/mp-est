@@ -1,5 +1,5 @@
 /***********************************************************************
- *  mpest 2.1
+ *  mpest 3.0
  *
  *  copyright 2014-2024
  *
@@ -23,8 +23,11 @@
  ************************************************************************/
 
 #include	"mpest.h"
+#include 	"neighbour_joining.h"
+#include 	"tool.h"
 
 int 		AddNode (Tree *tree, int fromnode, int fromfather, int tonode);
+int 		AllocateMemory (int nspecies);
 int 		Algorithm (int **triple, FILE *besttreefile, FILE *outputfile, int runindex);
 void 		CopyTree (Tree *from, Tree *to);
 int 		DeleteNode (Tree *tree, int inode);
@@ -33,99 +36,178 @@ int 		FindTriple (int node1, int node2, int node3, int *location);
 int 		FindQuartet (int node1, int node2, int node3, int node4, int *location);
 void 		FindOffsprings (int *offsprings, Tree *tree, int inode);
 int 		FindOutgroup (Tree *tree);
-int 		GenetreePartitions (char *treefile, char *outfile, int ntrees);
+void 		FreeMemory (void);
+int 		GenetreePartitions (char *treefile, int ntrees);
+int 		GenetreeNodeDistance (char *treefile, double *nodedistance);
+int 		InitialSpeciesTreePara (void);
 int 		LogBinomialP (int n, int x, double p, double *logp);
 int 		Loglikelihood (int **triple, Tree *tree, double *loglike);
 void 		MoveBrlens (Tree *tree);
 int 		MoveNode (Tree *tree);
+int 		NJst (double *nodedistance, char **speciesname, uint32_t species_count, int outgroupSpecies);
 int 		NodeDistance (int node1, int node2, Tree *tree);
+int 		NodeDistanceLocation (int sp1, int sp2, int *location);
 void 		PrintHeader (void);
+void 		PrintHelp (void);
 int			PrintPhylipTree (Tree *tree, int inode, int showBrlens, int showTheta, int isRooted);
 int 		printSptree (void);
 int 		PrintState (int round, FILE *fout, int addend);
 int 		PrintTree (Tree *tree, int inode, int showName, int showBrlens, int showTheta, int showSupport, int isRooted);
-int 		QuartetDistance (char *quartetfile, char *outfile, int ntrees);
+int 		QuartetDistance (char *quartetfile, int ntrees);
 int 		QuartetsFreqInatree (int **quartet, Tree *tree);
-int 		QuartetsList (char *treefile, char *outfile, int ntrees);
+int 		QuartetsList (char *treefile, int ntrees);
 void 		RandomTree (Tree *tree);
 void 		RandomVector (int *array, int number);
 int 		ReadaTree (FILE *fTree, Tree *tree);
-int 		SptreePartitionSupport (char *genetreefile);
+int 		ReadaTreeString (char *treestring, Tree *tree, bool taxaorder);
+int 		ReadSPtableFromInputFile (char *inputfile);
+int 		ReadParametersFromInputFile (char *inputfile);
+int 		SptreePartitionSupport (char *treefile);
+int 		StartSpeciesTree (int userdefinedtree);
 int 		SwapNodes (Tree *tree, int inode, int jnode);
 int 		TreePartitions (int **partitions, Tree *tree);
 int			TreeTraversalPostorder (int node, Tree *tree);
 int			TreeTraversalPreorder (int node, Tree *tree);
-int 		TreeBranchCollapse (char *treefile, FILE *foutput);
-int 		TripleDistance (char *triplefile, char *outfile, int ntrees);
+int 		TreeBranchCollapse (char *treefile);
+int 		TripleDistance (char *treefile, int ntrees);
 int 		TriplesFreq (char *treefile, int ngene);
 int 		TriplesFreqInatree (int **triple, Tree *tree);
 int			TriplesFreqInatreeCollapse (int **triple, Tree *tree); /*we do NOT need this function*/
-int 		TriplesList (char *treefile, char *outfile, int ntrees);
+int 		TriplesList (char *treefile, int ntrees);
+int 		UpdateSPtable ();
 void 		WriteTreeToFile (Tree *tree, int inode, int showName, int showBrlens, int showTheta, int showSupport, int isRooted);
 void		WritePhylipTreeToFile (Tree *tree, int inode, int showBrlens, int showTheta, int isRooted);
 
-
-/*global variables*/
-char            *printString;      /* string for printing to a file  */
-size_t          printStringSize;   /* length of printString   */
 Tree 		sptree;
-int		**triplematrix; /*store the frequency of gene tree triples*/ 
+int		    **triplematrix; /*store the frequency of gene tree triples*/ 
 char		spacer[10]="  ";
 long int	seed = -1;
 int 		usertree=0;		/* 1: use the usertree as the starting tree */
-int		    taxanodenumber[NTAXA];
-char		taxanames[NTAXA][LSPNAME];
 char 		genetreefile[LSPNAME];
+char		usertreefile[LSPNAME];
 int 		totaltaxa;
 double		curLn;
-int 		nruns;
+float 		collapseBrlens;
+int 		nruns=1;
 int		    numupdatenodes;
 int			numGenes;
+int			genetreetype; /*0: rooted 1:unrooted*/
 int		    updatenodes[NTAXA];
 int 		postorderindex = 0;
 int			calculatedistance = 0;
+SPtable		sptable;
 
 int main (int argc, char *argv[]){
-	int i, j, k, n, ngene, ntriples; 
-	FILE *fin, *fbesttree, *foutputtree;
+	int i, opt; 
+	char besttreefile[150], outputtreefile[150];
 	time_t t;
 	struct tm *current;
-	char speciesname[NTAXA][LSPNAME], name[LSPNAME];
-	char besttreefile[100], outputtreefile[100];
+	FILE *fbesttree, *foutputtree;
 
-    PrintHeader();
-	
-    /*read the control file*/
-	fin = (FILE*)gfopen(argv[1],"r");
-	if(fscanf(fin,"%s%d%ld%d%d%d", genetreefile, &calculatedistance, &seed, &nruns, &ngene, &(sptree.ntaxa)) != 6){
-			printf("Errors in the control file\n");
-			return ERROR;
+	/*parse command line*/
+	while((opt = getopt(argc, argv, ":i:s:u:n:c:hTQPLBN")) != -1) { 
+        switch(opt) { 
+            case 'i': 
+				strcpy(genetreefile, optarg); 
+                break; 
+            case 's': 
+				if(atoi(optarg)){
+					seed = atoi(optarg);
+				}            
+                break; 
+			case 'u':
+				strcpy(usertreefile, optarg);
+				usertree = 1;
+				break;
+			case 'n':
+				nruns = atoi(optarg);
+				break;
+			case 'c':
+				calculatedistance = 4;
+				collapseBrlens = atof(optarg);
+				break;
+			case 'h':
+				PrintHelp();
+				return NO_ERROR;
+				break;
+			case 'T':
+				calculatedistance = 1;
+				break;
+			case 'Q':
+				calculatedistance = 2;
+				break;
+			case 'P':
+				calculatedistance = 3;
+				break;
+			case 'N':
+				calculatedistance = 5;
+				break;
+			case 'L':
+				usertree = 2;
+				break;
+			case 'B':
+				usertree = 3;
+				break;
+            case ':': 
+				PrintHelp();
+                printf("Command line error: option -%c needs a value\n", optopt);
+				return NO_ERROR; 
+                break; 
+            case '?': 
+				PrintHelp();
+                printf("Command line error: unknown option: -%c\n", optopt);
+				return NO_ERROR;
+                break; 
+        } 
+    } 
+
+	if (genetreefile[0] == '\0'){
+		PrintHelp();
+		return ERROR;
 	}
-	numGenes = ngene; /*this needs to be fixed*/
-		
-	/*output files*/
-	if(calculatedistance == 0){
-		sprintf(besttreefile, "%s_besttree.tre", genetreefile);
-    	sprintf(outputtreefile, "%s_output.tre", genetreefile);
-		fbesttree = (FILE*)gfopen(besttreefile,"w");
-    	foutputtree = (FILE*)gfopen(outputtreefile,"w");
-	}else if (calculatedistance == 1){
-		sprintf(besttreefile, "%s_genetree.triple", genetreefile);
-		sprintf(outputtreefile, "%s_genetree.triple.dis", genetreefile);
-	}else if (calculatedistance == 2){
-		sprintf(besttreefile, "%s_genetree.quartet", genetreefile);
-		sprintf(outputtreefile, "%s_genetree.quartet.dis", genetreefile);
-	}else if(calculatedistance ==3){
-		sprintf(besttreefile, "%s_genetree.partition", genetreefile);
-	}else{
-		sprintf(outputtreefile, "%s_collapse.tre", genetreefile);
-		foutputtree = (FILE*)gfopen(outputtreefile,"w");
-		TreeBranchCollapse(genetreefile, foutputtree);
-		fclose(foutputtree);
+
+	if(usertree>0 && strlen(usertreefile) == 0){
+		PrintHelp();
+		if(usertree == 2){
+			printf("Command line error: please provide a user tree for option -L\n");
+		}
+		if(usertree == 3){
+			printf("Command line error: please provide a user tree for option -B");
+		}
 		return NO_ERROR;
 	}
 
-    /*set seed*/
+	/*read parameters from input file*/
+	if(ReadParametersFromInputFile(genetreefile) == ERROR){
+		printf("Errors in ReadParametersFromInputFile\n");
+		return ERROR;
+	}
+
+	if(genetreetype == 1 && calculatedistance == 0){
+		printf("\nThe input gene trees for the MPEST analysis must be rooted trees\nNote that input gene trees do not have to be binary. MPEST can take polytomy (rooted) gene trees.");
+		return ERROR;
+	}
+	if(genetreetype == 1 && calculatedistance == 1){
+		printf("\nTo calculate Triple Distance, input gene trees must be rooted trees.\nNote that polytomy (rooted) gene trees are allowed.");
+		return ERROR;
+	}
+	
+	/*allocate memory*/
+	AllocateMemory (sptree.ntaxa);
+
+	/*read sptable from input file*/
+	if(ReadSPtableFromInputFile(genetreefile) == ERROR){
+		printf("Errors in ReadSPtableFromInputFile\n");
+		return ERROR;
+	}
+
+	/*initialize species tree*/
+	if(InitialSpeciesTreePara() == ERROR){
+		printf("Errors in InitialSpeciesTreePara\n");
+		return ERROR;
+	}
+
+	/*set seed*/
 	if(seed < 0){
 		time(&t);
 		current = localtime(&t);
@@ -134,34 +216,148 @@ int main (int argc, char *argv[]){
 	}else{
 		SetSeed(seed);
     }
-    
-	/*the correspondence between species and individual sequences*/
-    totaltaxa = 0;
-	for(i=0; i<sptree.ntaxa; i++){
-        if(fscanf(fin,"%s%d", speciesname[i], &n) != 2){
-				printf("There are something wrong in the control file\n");
-				return ERROR;
+
+	/************************************************************************
+	*	 Algorithm for triple, quartet, partition, collapse, njst          *
+	************************************************************************/
+	if(calculatedistance == 1){
+		if(TriplesList(genetreefile, numGenes) == ERROR){
+			printf("Errors in TriplesList\n");
+			return ERROR;
 		}
-		for(j=0; j<n; j++){
-			if(fscanf(fin,"%s", taxanames[totaltaxa]) != 1){
-				printf("There are something wrong in the control file\n");
-				return ERROR;
-			}	
-			/*defines the species number that each taxon belongs to*/ 
-			taxanodenumber[totaltaxa++] = i;
+		if(TripleDistance (genetreefile, numGenes) == ERROR){
+			printf("Errors in TripleDistance\n");
+			return ERROR;
 		}
+		printf("\nGene tree triples are saved in file %s_triple.list", genetreefile);
+		printf("\nTriple distances among gene trees are saved in file %s_triple.dis\n", genetreefile);
+		return NO_ERROR;
 	}
-     
-    /*the lengths of the external branches are 1.0, because they are unestimable*/
-    for(i=0; i<sptree.ntaxa; i++){
-		sptree.nodes[i].brlens = 1.0;
+	if(calculatedistance == 2){
+		if(QuartetsList(genetreefile, numGenes) == ERROR){
+			printf("Errors in QuartetsList\n");
+			return ERROR;
+		}
+		if(QuartetDistance (genetreefile, numGenes) == ERROR){
+			printf("Errors in QuartetDistance\n");
+			return ERROR;
+		}
+		printf("\nGene tree quartets are saved in file %s_triple.list", genetreefile);
+		printf("\nQuartet distances among gene trees are saved in file %s_triple.dis\n", genetreefile);
+		return NO_ERROR;
 	} 
-	for(i=0; i<2*sptree.ntaxa; i++){
-		sptree.nodes[i].theta = 0.0;
-		sptree.nodes[i].support = 0.0;
+	if(calculatedistance == 3){
+		if(GenetreePartitions(genetreefile, numGenes) == ERROR){
+			printf("Errors in GenetreePartitions\n");
+			return ERROR;
+		}
+		printf("\nPartitions of gene trees are saved in file %s_partition\n", genetreefile);
+		return NO_ERROR;
+	} 
+	if(calculatedistance == 4){
+		if(TreeBranchCollapse(genetreefile) == ERROR){
+			printf("Errors in TreeBranchCollapse\n");
+			return ERROR;
+		}
+		printf("\nPolytomy gene trees are saved in file %s_collapse.tre\n", genetreefile);
+		return NO_ERROR;
 	}
-    
-    /****************************************************************************************
+	if(calculatedistance == 5){
+		/*build NJst tree and use it as the start tree in the algorithm*/
+		double *nodedistance;
+		nodedistance = (double*) malloc (sptree.ntaxa * (sptree.ntaxa-1) / 2 * sizeof(double*));
+
+		/*calculate nodedistance*/
+		if(GenetreeNodeDistance (genetreefile, nodedistance) == ERROR){
+			printf("Errors in GenetreeNodeDistance\n");
+			return ERROR;
+		}	
+
+		/*build NJst tree*/
+		NJst(nodedistance, sptable.speciesname, sptree.ntaxa, sptree.outgroupnode);
+
+		/*set species tree*/
+		ReadaTreeString (printString, &sptree, YES);
+		sprintf(besttreefile, "%s_njst.tre", genetreefile);
+		fbesttree = fopen(besttreefile,"w");
+		fprintf(fbesttree,"begin trees;\n   Tree njst = %s\nEnd;", printString);
+		printf("\nNJst tree is saved in file %s\n", besttreefile);
+		
+        free(printString);
+		free(nodedistance);
+		fclose(fbesttree);
+		return NO_ERROR;
+	}
+	
+	/************************************************************************
+	*	Algorithm for MP-EST                                                *
+	************************************************************************/
+	PrintHeader();
+	printf("        Build NJst tree (initial tree in algorithm)     ....");
+	if(StartSpeciesTree (usertree) == ERROR){
+		printf("Errors in StartSpeciesTree\n");
+		return ERROR;
+	};
+	printf("completed....\n");
+        
+	/*summarize triples in gene trees*/
+	printf("        Calculate triple frequencies of %d gene trees ....", numGenes);
+	if(TriplesFreq (genetreefile, numGenes) == ERROR){
+		printf("Errors in TriplesFreq\n");
+		return ERROR;
+	}
+	printf("completed....\n\n        MPEST algorithm starts here....\n\n");
+
+    /*algorithm begins here*/
+	sprintf(besttreefile, "%s_besttree.tre", genetreefile);
+	sprintf(outputtreefile, "%s_output.tre", genetreefile);
+	fbesttree = fopen(besttreefile,"w");
+	foutputtree = fopen(outputtreefile,"w");
+
+	for(i=0; i<nruns; i++){
+		if(Algorithm (triplematrix, fbesttree, foutputtree, i) == ERROR){
+			printf("Errors in Algorithm\n");
+			return ERROR;
+		}
+	}
+	fprintf(fbesttree, "end;\n\n");
+    fprintf(foutputtree, "end;\n\n");
+	fclose(fbesttree);
+	fclose(foutputtree);
+
+	/*free memory*/
+	FreeMemory();
+
+  	return NO_ERROR;
+}
+
+void PrintHelp (void){
+	char message[]= "\n\nMaximum Pseudo-likelihood Estimation of Species Trees - MPEST\nVersion 3.0\n(c) Copyright, 2014-2024 Liang Liu\nDepartment of Statistics, University of Georgia\n\nUsage: mpest [-i inputfile] [-n #] [-s #] [-u NAME] [-h] [-B|-C|-L|-N|-P|-Q|-T|]\n  -i: NAME = name of input file in nexus format. Input gene trees must be rooted; polytomy trees are allowed.\n  -n: # = number of runs [default = 1].\n  -s: # = seed for random number generator [default = system generated].\n  -u: NAME = name of user tree file.\n  -c: # = convert short branches (<#) to polytomies in gene trees.\n  -h: help message [default = random].\n  -B: optimize branch lengths of a fixed species tree provided through usertree option -u.\n  -L: calculate loglikelihood of a species tree provided through usertree option -u.\n  -N: build NJst tree.\n  -P: calculate partitions for gene trees.\n  -Q: calculate pairwise quartet distances among gene trees. Polytomy (unrooted or rooted) gene trees are allowed.\n  -T: calculate pairwise triple distances of gene trees. Polytomy rooted gene trees are allowed.\n\n";
+  	printf("%s", message);
+}
+
+void FreeMemory (void){
+	/*free memory*/
+	free(triplematrix[0]);
+	free(triplematrix);
+
+	/*free sptable*/
+	free(sptable.taxanodenumber);
+
+	/*free sptable.speciesname*/	
+    free(sptable.speciesname[0]);
+	free(sptable.speciesname);
+
+	/*free sptable.taxaname*/
+	free(sptable.taxaname[0]);
+	free(sptable.taxaname);
+}
+
+int StartSpeciesTree (int userdefinedtree){
+	int j;
+	FILE *fin;
+
+	/****************************************************************************************
     read the user tree
     usertree=0: random starting tree
     usertree=1: use the usertree as the starting tree 
@@ -169,39 +365,48 @@ int main (int argc, char *argv[]){
     usertree=3: calculate likelihood score for a fixed tree
     usertree=4: 
     ****************************************************************************************/
-	if(fscanf(fin,"%d", &usertree) != 1){
-		printf("Errors in the control file\n");
-		return ERROR;
-	}	
 	
-	if(usertree > 0){
-		/*read the initial species tree*/
+	if(userdefinedtree == 0){
+		/*build NJst tree and use it as the start tree in the algorithm*/
+		double *nodedistance;
+		nodedistance = (double*) malloc (sptree.ntaxa * (sptree.ntaxa-1) / 2 * sizeof(double*));
+
+		/*calculate nodedistance*/
+		if(GenetreeNodeDistance (genetreefile, nodedistance) == ERROR){
+			printf("Errors in GenetreeNodeDistance\n");
+			return ERROR;
+		}	
+
+		/*build NJst tree*/
+		NJst(nodedistance, sptable.speciesname, sptree.ntaxa, sptree.outgroupnode);
+
+		/*set species tree*/
+		ReadaTreeString (printString, &sptree, YES);
+        free(printString);
+
+		/*if taxaorder=YES when setting sptree, no need to update SPtable*/
+		//UpdateSPtable();
+
+		free(nodedistance);
+	}else{
+		/*read user species tree*/
+		fin = fopen(usertreefile, "r");
+		if(!fin){
+			printf("Error: cannot open file %s\n", usertreefile);
+			return ERROR;
+		}
+
 		if(ReadaTree(fin, &sptree) == ERROR){
 			printf("Errors in the user tree; It must be a rooted binary tree.\n");
 			return ERROR;
 		}
-        
-        /*we need to update taxanumber, because we change the order of the taxanames in the species tree*/
-        for(i=0; i<totaltaxa; i++){
-            for(j=0; j<sptree.ntaxa; j++){
-                if(taxanodenumber[i] == j){
-                    for(k=0;k<sptree.ntaxa;k++){
-                        if(strcmp(speciesname[j],sptree.nodes[k].taxaname)==0)  {
-                            taxanodenumber[i] = k;
-                            break;
-                        }
-                    }
-                    if(k == sptree.ntaxa){
-                        printf("%s in the species-allele table is missing in the user-specified species tree\n\n",speciesname[j]);
-                        return ERROR;
-                    }
-                    break;
-                }
-            }
-        }
-        
+		fclose(fin);
+
+        /*update SPtable*/
+        UpdateSPtable();
+		
         /*read taxa whose placements need to be updated*/	
-        if(usertree == 4) {
+       /* if(userdefinedtree == 4) {
 			if(fscanf(fin,"%d", &numupdatenodes) != 1){
 				printf("There are something wrong in the control file\n");
 				return ERROR;
@@ -224,48 +429,24 @@ int main (int argc, char *argv[]){
 				}
 			}
 			for(j=0;j<2*sptree.ntaxa-1;j++) if(sptree.nodes[j].brlens>0) sptree.nodes[j].brlens = 0.5;
-		}	    
-	}else{
-        for(i=0; i<sptree.ntaxa; i++){
-            strcpy(sptree.nodes[i].taxaname, speciesname[i]);
-        }
-    }
-	fclose(fin);
-
-	/************************************************************************
-	*	 Algorithm for triple distance                                      *
-	************************************************************************/
-	if(calculatedistance == 1){
-		/*calculate triples*/
-		TriplesList(genetreefile, besttreefile, ngene);
-
-		/*calculate triple distance*/
-		TripleDistance (besttreefile, outputtreefile, ngene);
-
-		return NO_ERROR;
+		}	*/    
 	}
 
-	if(calculatedistance == 2){
-		/*calculate quartets*/
-		QuartetsList(genetreefile, besttreefile, ngene);
-
-		/*calculate triple distance*/
-		QuartetDistance (besttreefile, outputtreefile, ngene);
-	
-		return NO_ERROR;
+	/*terminal branch length = 1 if one allele per species*/
+	if(totaltaxa == sptree.ntaxa){
+		for(j=0; j<sptree.ntaxa; j++){
+			sptree.nodes[j].brlens = 1.0;
+		}
 	}
 
-	if(calculatedistance == 3){
-		/*calculate quartets*/
-		GenetreePartitions(genetreefile, besttreefile, ngene);
-		return NO_ERROR;
-	}
+	return NO_ERROR;
+}
 
-	/************************************************************************
-	*	Algorithm for MP-EST                                                *
-	************************************************************************/
-	/*allocate memory for triplematrix*/
-	ntriples = sptree.ntaxa*(sptree.ntaxa-1)*(sptree.ntaxa-2)/6;
+int AllocateMemory (int nspecies){
+	int ntriples, i;
+
+	/*allocate triplematrix*/
+	ntriples = nspecies*(nspecies-1)*(nspecies-2)/6;
 	triplematrix = (int**)calloc(ntriples, sizeof(int*));
     triplematrix[0] = (int*)calloc(4*ntriples, sizeof(int));
    	for(i=0; i<ntriples; i++)
@@ -275,35 +456,479 @@ int main (int argc, char *argv[]){
 	   	return ERROR;
 	} 
 
-	/*summarize triples in gene trees and triples are stored in triplematrix*/
-	if(TriplesFreq (genetreefile, ngene) == ERROR){
-		printf("Errors in the TriplesFreq function\n");
+	/*allocate sptable*/
+	sptable.taxanodenumber = (int*) malloc (totaltaxa * sizeof(int*));
+
+	/*allocate sptable.speciesname*/
+	sptable.speciesname = (char**)calloc(nspecies, sizeof(char*));
+    sptable.speciesname[0] = (char*)calloc(nspecies*LSPNAME, sizeof(int));
+   	for(i=0; i<nspecies; i++){
+		sptable.speciesname[i] = sptable.speciesname[0] + i*LSPNAME;
+	}
+  	if(!sptable.speciesname){
+		printf(" allocating problem for sptable.speciesname\n");
+	   	return ERROR;
+	} 
+
+	/*allocate sptable.taxaname*/
+	sptable.taxaname = (char**)calloc(totaltaxa, sizeof(char*));
+    sptable.taxaname[0] = (char*)calloc(totaltaxa*LSPNAME, sizeof(int));
+   	for(i=0; i<totaltaxa; i++){
+		sptable.taxaname[i] = sptable.taxaname[0] + i*LSPNAME;
+	}  		
+  	if(!sptable.taxaname){
+		printf(" allocating problem for sptable.taxaname\n");
+	   	return ERROR;
+	} 
+
+	return NO_ERROR;
+}
+
+int ReadParametersFromInputFile (char *inputfile){
+	int c, index, i, j, n;
+	char buffer[LSPNAME], x[LSPNAME];	
+	FILE *fin = fopen(inputfile, "r");
+
+	if(!fin){
+		PrintHelp();
+		printf("Error: cannot open file %s\n", inputfile);
 		return ERROR;
 	}
 
-    /*algorithm begins here*/
-	for(i=0; i<nruns; i++){
-		if(Algorithm (triplematrix, fbesttree, foutputtree, i) == ERROR){
-			printf("Errors in Algorithm\n");
+	while(!feof(fin)){
+		if(fscanf(fin, "%s", buffer) != 1){
+			printf("Error: cannot read gene tree file 1 %s\n", inputfile);
 			return ERROR;
 		}
+		
+		for(char *p=buffer; *p; p++){
+			*p=tolower(*p);
+		} 
+
+		/*sptree.ntaxa and numGenes*/
+		if(!strcmp(buffer,"dimension")){
+			c=fgetc(fin);
+			while(c != 'n'){
+				c=fgetc(fin);
+			}
+			c=tolower(fgetc(fin));
+			if(c=='t'){
+				while(c != '='){
+					c=fgetc(fin);
+				}
+				if(fscanf(fin,"%d", &sptree.ntaxa) != 1){
+					printf("Error: cannot read gene tree file 2 %s\n", inputfile);
+					return ERROR;;
+				}
+				c=fgetc(fin);
+				while(c != '='){
+					c=fgetc(fin);
+				}
+				
+				if(fscanf(fin,"%d", &numGenes) != 1){
+					printf("Error: cannot read gene tree file 3 %s\n", inputfile);
+					return ERROR;
+				}
+			}else{
+				while(c != '='){
+					c=fgetc(fin);
+				}
+				if(fscanf(fin,"%d", &numGenes) != 1){
+					printf("Error: cannot read gene tree file %s\n", inputfile);
+					return ERROR;;
+				}
+				c=fgetc(fin);
+				while(c != '='){
+					c=fgetc(fin);
+				}
+				if(fscanf(fin,"%d", &sptree.ntaxa) != 1){
+					printf("Error: cannot read gene tree file 4 %s\n", inputfile);
+					return ERROR;;
+				}
+			}
+		}
+		
+		/*sptree.outgroup and treetype*/
+		if(!strcmp(buffer,"format")){
+			c=fgetc(fin);
+			while(!isalpha(c)){
+				c=fgetc(fin);
+			}
+			if(tolower(c)=='t'){
+				while(c != '='){
+					c=fgetc(fin);
+				}
+				if(fscanf(fin,"%s", x) != 1){
+					printf("Error: cannot read gene tree file 5 %s\n", inputfile);
+					return ERROR;;
+				}
+				if(tolower(x[0]) == 'r'){
+					genetreetype = 0;
+				}else{
+					genetreetype = 1;
+				}
+				c = fgetc(fin);
+				while(c != '='){
+					c = fgetc(fin);
+				}
+				while(!isalpha(c)){
+					c = fgetc(fin);
+				}
+				sptree.outgroup[0]=c;
+				index = 1;
+				while(c != ' ' && c != ';' && c != '\t'){
+					c = fgetc(fin);
+					sptree.outgroup[index++] = c;
+				}
+				sptree.outgroup[index-1] = '\0';
+			}else{
+				while(c != '='){
+					c=fgetc(fin);
+				}
+				if(fscanf(fin,"%s", sptree.outgroup) != 1){
+					printf("Error: cannot read gene tree file 6 %s\n", inputfile);
+					return ERROR;
+				}
+				c = fgetc(fin);
+				while(c != '='){
+					c = fgetc(fin);
+				}
+				if(fscanf(fin,"%s", x) != 1){
+					printf("Error: cannot read gene tree file 7 %s\n", inputfile);
+					return ERROR;
+				}
+				if(tolower(x[0]) == 'r'){
+					genetreetype = 0;
+				}else{
+					genetreetype = 1;
+				}
+			}			
+		}
+
+		/*find totaltaxa*/
+		if(!strcmp(buffer,"matrix")){
+			totaltaxa = 0;
+			for(i=0; i<sptree.ntaxa; i++){
+				if(fscanf(fin,"%s %d", x, &n) != 2){
+					printf("# of species in SPtable != ntaxa in file %s\n", inputfile);
+					return ERROR;
+				}
+				totaltaxa += n;
+				for(j=0; j<n; j++){
+					if(fscanf(fin,"%s", x) != 1){
+						printf("Errors in SPtable in file %s\n", inputfile);
+						return ERROR;
+					}	
+				}
+			}			
+		}
+		
+		if(!strcmp(buffer,"end;")){
+			break;
+		}
 	}
-	fprintf(fbesttree, "end;\n\n");
-    fprintf(foutputtree, "end;\n\n");
 
-	/*free memory*/
-	free(triplematrix[0]);
-	free(triplematrix);
+	while(!feof(fin)){
+		if(fscanf(fin, "%s", buffer) != 1){
+			printf("Error: cannot read gene tree file 1 %s\n", inputfile);
+			return ERROR;
+		}
+		
+		for(char *p=buffer; *p; p++){
+			*p=tolower(*p);
+		} 
 
-  	return NO_ERROR;
+		if(!strcmp(buffer,"end;")){
+			break;
+		}
+
+		if(!strcmp(buffer,"trees;") || !strcmp(buffer,"trees") || !strcmp(buffer,"tree")){
+			n = 0;
+		}else{
+			n++;
+		}
+	}
+
+	if (numGenes > n){
+		printf("There are %d < %d gene trees in the input file %s\n",n, numGenes, inputfile);
+		return ERROR;
+	}
+
+	fclose(fin);
+	return NO_ERROR;
 }
 
-int GenetreePartitions (char *treefile, char *outfile, int ntrees){
+int ReadSPtableFromInputFile (char *inputfile){
+	int index, i, j, n;
+	char buffer[LSPNAME];	
+	FILE *fin = fopen(inputfile, "r");
+
+	if(!fin){
+		printf("Error: cannot open file %s\n", inputfile);
+		return ERROR;
+	}
+
+	while(!feof(fin)){
+		if(fscanf(fin, "%s", buffer) != 1){
+			printf("Error: cannot read input file %s\n", inputfile);
+			return ERROR;
+		}
+		for(char *p=buffer; *p; p++){
+			*p=tolower(*p);
+		} 
+		
+		if(!strcmp(buffer,"matrix")){
+			index = 0;
+			for(i=0; i<sptree.ntaxa; i++){
+				if(fscanf(fin,"%s %d", sptable.speciesname[i], &n) != 2){
+					printf("Errors in sptable in file %s\n", inputfile);
+					return ERROR;
+				}
+				for(j=0; j<n; j++){
+					if(fscanf(fin,"%s", sptable.taxaname[index]) != 1){
+						printf("Errors in sptable in file %s\n", inputfile);
+						return ERROR;
+					}	
+					/*defines the species number that each taxon belongs to*/ 
+					sptable.taxanodenumber[index++] = i;
+				}
+			}
+			break;			
+		}
+	}
+	fclose(fin);
+
+	return NO_ERROR;
+}
+
+int InitialSpeciesTreePara(){
+	int i;
+
+	/*species names*/
+	for(i=0; i<sptree.ntaxa; i++){
+        strcpy(sptree.nodes[i].taxaname, sptable.speciesname[i]);
+    }
+
+	/*find outgroupnode*/
+	for(i=0; i<sptree.ntaxa; i++){
+		if(!strcmp(sptree.nodes[i].taxaname, sptree.outgroup)){
+			break;
+		}
+	}
+	if(i == sptree.ntaxa){
+		printf("cannot find the outgroup species %s\n", sptree.outgroup);
+		return ERROR;
+	}
+	sptree.outgroupnode = i;
+
+	/*initialize other parameters*/
+	for(i=0; i<2*sptree.ntaxa-1; i++){
+		sptree.nodes[i].theta = 0.0;
+		sptree.nodes[i].support = 0.0;
+		if(i<sptree.ntaxa){
+			sptree.nodes[i].brlens = 1.0;
+		}
+	}		
+
+	return NO_ERROR;
+}
+
+int UpdateSPtable (){
+	int i, j, k;
+
+	/*update sptable taxanodenumber*/
+	for(i=0; i<totaltaxa; i++){
+		for(j=0; j<sptree.ntaxa; j++){
+			if(sptable.taxanodenumber[i] == j){
+				for(k=0;k<sptree.ntaxa;k++){
+					if(strcmp(sptable.speciesname[j],sptree.nodes[k].taxaname)==0)  {
+						sptable.taxanodenumber[i] = k;
+						break;
+					}
+				}
+				if(k == sptree.ntaxa){
+					printf("%s is missing in the user tree\n\n",sptable.speciesname[j]);
+					return ERROR;
+				}
+				break;
+			}
+		}
+	}
+
+	/*update sptable speciesname*/
+	for(i=0; i<sptree.ntaxa; i++){
+		strcpy(sptable.speciesname[i], sptree.nodes[i].taxaname);
+	}
+
+	/*update outgroupnode*/
+	for(i=0; i<sptree.ntaxa; i++){
+		if(!strcmp(sptree.nodes[i].taxaname, sptree.outgroup)){
+			break;
+		}
+	}
+	if(i == sptree.ntaxa){
+		printf("cannot find the outgroup species %s\n", sptree.outgroup);
+		return ERROR;
+	}
+	sptree.outgroupnode = i;
+
+	return NO_ERROR;
+}
+
+int NJst (double *nodedistance, char **speciesname, uint32_t species_count, int outgroupSpecies) {
+	int i, j, index;
+	double *element;
+	dist_matrix *dmat;
+	
+	dmat = dist_matrix_init(species_count);
+    if (!dmat) {
+        perror("Unable to create distance matrix");
+        return NO_ERROR;
+    }
+
+	index = 0;
+    for (i = 0; i < species_count; i++) {
+		dist_matrix_set_species_name(dmat, i, speciesname[i]);
+        dmat->cluster_sizes[i] = 1;
+		if(i==outgroupSpecies){/*add a large distance for outgroupSpecies to root the tree*/
+			for (j = 0; j < i; j++) {
+				/*dist_matrix is the lower triangler matrix*/
+				element = dist_matrix_element(dmat, i, j);
+				*element = 2*species_count;
+			}
+		}else{
+			for (j = 0; j < i; j++) {
+				/*dist_matrix is the lower triangler matrix*/
+				element = dist_matrix_element(dmat, i, j);
+				*element = nodedistance[index++];
+			}
+		}
+    }
+
+	/*building the NJ tree using the function from neighbour_joining.c*/
+	NeighborJoining(dmat);
+	
+	return NO_ERROR;	
+}
+
+int GenetreeNodeDistance (char *treefile, double *nodedistance){
+	int numdistance = sptree.ntaxa * (sptree.ntaxa-1) / 2;
+	int i, j, k, index, stop, sp1, sp2, location, *muldistcount;
+	Tree genetree;
+	FILE *fin;
+	double *distance;
+	
+	/*allocate memory for distance; muldistcount for multiple alleles per species*/
+	distance = (double*) malloc (numdistance * sizeof(double*));
+	muldistcount = (int*) malloc (numdistance * sizeof(int*));
+	for(i=0; i<numdistance; i++){
+		distance[i] = 0.0;
+		muldistcount[i] = 0;
+	}
+
+	fin = fopen(treefile,"r");
+	if(!fin){
+		printf("Error: cannot open file %s\n", treefile);
+		return ERROR;
+	}
+	/*find node distances*/
+	for(i=0; i<numGenes; i++){
+		if(ReadaTree(fin, &genetree) == ERROR) {
+			printf("Errors in gene tree %d.\n", i+1);
+			return ERROR;
+		}
+
+		/*find gene tree namenumber*/
+		for(j=0; j<genetree.ntaxa; j++){
+			stop = 0;
+			for(k=0; k<totaltaxa; k++){
+				if(!strcmp(genetree.nodes[j].taxaname, sptable.taxaname[k])){
+					stop = 1; 
+					genetree.nodes[j].namenumber = sptable.taxanodenumber[k];
+					break;
+				}
+			}
+			if(stop == 0){
+				printf("The taxon %s in gene tree %d is missing in the species-allele table\n", genetree.nodes[j].taxaname, i);
+				return ERROR;
+			}
+		}
+
+		for(j=0; j<genetree.ntaxa-1; j++){
+			for(k=j+1; k<genetree.ntaxa; k++){
+				sp1 = genetree.nodes[j].namenumber;
+				sp2 = genetree.nodes[k].namenumber;
+
+				/*calculate node distance for two distinct species*/
+				if(sp1 != sp2){
+					if(NodeDistanceLocation (sp1, sp2, &location) == ERROR){
+						printf("Errors in NodeDistanceLocation\n");
+						return ERROR;
+					}
+					distance[location] += NodeDistance(j, k, &genetree);
+					muldistcount[location] += 1;
+				}				
+			}
+		}
+	}
+
+	index=0;
+	for(j=0; j<sptree.ntaxa-1; j++){
+		for(k=j+1; k<sptree.ntaxa; k++){
+			nodedistance[index] = distance[index]/muldistcount[index];
+			if(nodedistance[index] >= sptree.ntaxa){
+				printf("nodedistance is greater than sptree.ntaxa\n");
+				return ERROR;
+			}
+			index++;
+		}
+	}
+
+	free(distance);
+	free(muldistcount);
+	fclose(fin);
+	return NO_ERROR;
+}
+
+int NodeDistanceLocation (int sp1, int sp2, int *location){ /*lower triangler matrix*/
+	int node1, node2;
+
+	if(sp1 < sp2){
+		node1 = sp1;
+		node2 = sp2;
+	}else if (sp1 > sp2){
+		node1 = sp2;
+		node2 = sp1;
+	}else{
+		printf("Errors in NodeDistanceLocation: two identical species!\n");
+		return ERROR;
+	}	
+	*location = node2*(node2-1)/2+node1;
+
+	return NO_ERROR;
+}
+
+int GenetreePartitions (char *treefile, int ntrees){
 	int numpartitions = sptree.ntaxa-1;
 	int i, j, k, x, stop;
 	Tree genetree;
-	FILE *fTree, *foutfile;
+	FILE *fin, *fout;
+	char outfile[100];
 	int **genetreepartitions, **genetreepartitions1;
+
+	
+	fin = fopen(treefile,"r");
+	if(!fin){
+		printf("Error: cannot open file %s\n", treefile);
+		return ERROR;
+	}
+
+	sprintf(outfile, "%s.partition", treefile);
+	fout = fopen(outfile,"w");
+	if(!fout){
+		printf("Error: cannot open file %s\n", outfile);
+		return ERROR;
+	}
 
 	/*allocate memory for genetreepartitions*/
 	genetreepartitions = (int**)calloc(numpartitions, sizeof(int*));
@@ -327,12 +952,9 @@ int GenetreePartitions (char *treefile, char *outfile, int ntrees){
 	   	return ERROR;
 	} 
 
-	fTree = (FILE*)gfopen(treefile,"r");
-	foutfile = (FILE*)gfopen(outfile,"w");
-
 	/*find gene tree partitions*/
 	for(i=0; i<ntrees; i++){
-		if(ReadaTree(fTree, &genetree) == ERROR) {
+		if(ReadaTree(fin, &genetree) == ERROR) {
 			printf("Errors in the gene tree %d.\n", i+1);
 			return ERROR;
 		}
@@ -341,9 +963,9 @@ int GenetreePartitions (char *treefile, char *outfile, int ntrees){
 		for(j=0; j<genetree.ntaxa; j++){
 			stop = 0;
 			for(k=0; k<totaltaxa; k++){
-				if(!strcmp(genetree.nodes[j].taxaname, taxanames[k])){
+				if(!strcmp(genetree.nodes[j].taxaname, sptable.taxaname[k])){
 					stop = 1; 
-					genetree.nodes[j].namenumber = taxanodenumber[k];
+					genetree.nodes[j].namenumber = sptable.taxanodenumber[k];
 					break;
 				}
 			}
@@ -375,31 +997,31 @@ int GenetreePartitions (char *treefile, char *outfile, int ntrees){
 			}
 		}
 
-		fprintf(foutfile,"tree%d\t",i+1);
+		fprintf(fout,"tree%d\t",i+1);
 		for(j=0; j<numpartitions; j++){
 			for(k=0; k<sptree.ntaxa; k++){
-				fprintf(foutfile,"%d", genetreepartitions[j][k]);
+				fprintf(fout,"%d", genetreepartitions[j][k]);
 			}
-			fprintf(foutfile," ");			
+			fprintf(fout," ");			
 		}
-		fprintf(foutfile,"\n");
+		fprintf(fout,"\n");
 	}
 
 	free(genetreepartitions[0]);
 	free(genetreepartitions);
 	free(genetreepartitions1[0]);
 	free(genetreepartitions1);
-	fclose(fTree);
-	fclose(foutfile);
+	fclose(fin);
+	fclose(fout);
 	
 	return NO_ERROR;
 }
 
-int SptreePartitionSupport (char *genetreefile){
+int SptreePartitionSupport (char *treefile){
 	int numpartitions = sptree.ntaxa-1;
 	int i, j, k, l, x, stop;
 	Tree genetree;
-	FILE *fTree;
+	FILE *fin;
 	int **genetreepartitions, **genetreepartitions1, **partitions;
 	
 	/*allocate memory for partitions*/
@@ -435,7 +1057,11 @@ int SptreePartitionSupport (char *genetreefile){
 	   	return ERROR;
 	} 
 
-	fTree = (FILE*)gfopen(genetreefile,"r");
+	fin = fopen(treefile,"r");
+	if(!fin){
+		printf("Error: cannot open file %s\n", treefile);
+		return ERROR;
+	}
 
 	/*find species tree partitions*/
 	TreePartitions(partitions, &sptree);
@@ -447,7 +1073,7 @@ int SptreePartitionSupport (char *genetreefile){
 
 	/*find gene tree partitions*/
 	for(i=0; i<numGenes; i++){
-		if(ReadaTree(fTree, &genetree) == ERROR) {
+		if(ReadaTree(fin, &genetree) == ERROR) {
 			printf("Errors in the gene tree %d.\n", i+1);
 			return ERROR;
 		}
@@ -456,9 +1082,9 @@ int SptreePartitionSupport (char *genetreefile){
 		for(j=0; j<genetree.ntaxa; j++){
 			stop = 0;
 			for(k=0; k<totaltaxa; k++){
-				if(!strcmp(genetree.nodes[j].taxaname, taxanames[k])){
+				if(!strcmp(genetree.nodes[j].taxaname, sptable.taxaname[k])){
 					stop = 1; 
-					genetree.nodes[j].namenumber = taxanodenumber[k];
+					genetree.nodes[j].namenumber = sptable.taxanodenumber[k];
 					break;
 				}
 			}
@@ -481,7 +1107,7 @@ int SptreePartitionSupport (char *genetreefile){
 			return ERROR;
 		}
 
-		/*change to species namenumbers*/
+		/*change to species namenumber*/
 		for(j=0; j<numpartitions; j++){
 			for(k=0; k<sptree.ntaxa; k++){
 				if(genetreepartitions[j][k] == 1){
@@ -522,7 +1148,7 @@ int SptreePartitionSupport (char *genetreefile){
 	free(genetreepartitions);
 	free(genetreepartitions1[0]);
 	free(genetreepartitions1);
-	fclose(fTree);
+	fclose(fin);
 	
 	return NO_ERROR;
 }
@@ -571,20 +1197,31 @@ int	TreeTraversalPreorder (int node, Tree *tree){
 	return NO_ERROR;
 }
 
-
-int TreeBranchCollapse (char *treefile, FILE *foutput){
+int TreeBranchCollapse (char *treefile){
    	int i, j, index, x, nleft=0, nright=0;
 	int leftposition[MAX_STRING_LENGTH], rightposition[MAX_STRING_LENGTH], position[MAX_STRING_LENGTH], treestrlength;
    	char treestring[MAX_STRING_LENGTH], str[100], ch, cha=' ';
 	double brlens;
-	FILE *fTree;
+	char outfile[100];
+	FILE *fin, *fout;
 
-	fTree = (FILE*)gfopen(treefile, "r");
+	fin = fopen(treefile, "r");
+	if(!fin){
+		printf("Error: cannot open file %s\n", treefile);
+		return ERROR;
+	}
+
+	sprintf(outfile, "%s_collapse.tre", treefile);
+	fout = fopen(outfile,"w");
+	if(!fout){
+		printf("Error: cannot open file %s\n", outfile);
+		return ERROR;
+	}
 
 	while(cha != EOF){
 		/*move to the first character of a treestring*/
 		while(cha != '(' && cha != EOF){
-			cha = fgetc(fTree);
+			cha = fgetc(fin);
 		}
 
 		if(cha == EOF){
@@ -595,11 +1232,11 @@ int TreeBranchCollapse (char *treefile, FILE *foutput){
 		index = 0;
 		while(cha != ';'){		
 			treestring[index++] = cha;
-			cha = fgetc(fTree);
+			cha = fgetc(fin);
 
 			/*skip white space*/
 			while(cha == ' '){
-				cha = fgetc(fTree);
+				cha = fgetc(fin);
 			}	
 		}
 
@@ -625,6 +1262,7 @@ int TreeBranchCollapse (char *treefile, FILE *foutput){
 			return ERROR;
 		}
 
+
 		/*for each right, we find the corresponding left parenthesis stored in position*/
 		for(i=0; i<nright; i++){
 			index = 1;
@@ -632,7 +1270,7 @@ int TreeBranchCollapse (char *treefile, FILE *foutput){
 				index++;
 			}
 			position[i] = leftposition[nleft-index];
-			leftposition[nleft-index] = rightposition[nright]+1;
+			leftposition[nleft-index] = rightposition[nright-1]+1;
 		}	
 
 		for(i=0; i<nright; i++){
@@ -656,7 +1294,7 @@ int TreeBranchCollapse (char *treefile, FILE *foutput){
 				//printf("str %s %d %d %c\n", str, x, index, treestring[x]);
 				
 				sscanf(str, "%lf", &brlens);
-				if(brlens != NA && brlens < COLLAPSEBRLENS){
+				if(brlens != NA && brlens < collapseBrlens){
 					for(j=x-index; j<x+1; j++){
 						treestring[j] = '*';
 					}
@@ -666,13 +1304,14 @@ int TreeBranchCollapse (char *treefile, FILE *foutput){
 		}
 		for(i=0; i<treestrlength; i++){
 			if(treestring[i] != '*'){
-				fprintf(foutput, "%c", treestring[i]);
+				fprintf(fout, "%c", treestring[i]);
 			}
 		}
-		fprintf(foutput, "\n");
+		fprintf(fout, "\n");
 	}
 	
-	fclose(fTree);
+	fclose(fin);
+	fclose(fout);
 	return NO_ERROR;
 }
 
@@ -774,21 +1413,26 @@ int Algorithm (int **triple, FILE *besttreefile, FILE *outputfile, int runindex)
 	time_t starttime, endtime;
 	clock_t start, end;
     double cpu_time_used;
-
+	
     /*starting tree*/
-	if(usertree == 0) RandomTree (&sptree);
+	if(usertree == 0){
+		//RandomTree (&sptree);
+	} 
 
 	CopyTree (&sptree, &oldsptree);
-	for(i=0; i<sptree.ntaxa; i++) strcpy(oldsptree.nodes[i].taxaname, sptree.nodes[i].taxaname);
-		
+	for(i=0; i<sptree.ntaxa; i++){
+		strcpy(oldsptree.nodes[i].taxaname, sptree.nodes[i].taxaname);
+	} 
+	
 	if(Loglikelihood (triple, &sptree, &curLn) == ERROR){
 		printf("Errors in Loglikelihood\n");
 		return ERROR;
 	}
 
     /*calculating the likelihood score for a fixed tree, which is given as the user tree*/
-    if(usertree == 3) {
-		printf("%lf\n",curLn);
+    if(usertree == 2) {
+		printf("loglikelihood of the species tree is %lf\n", curLn);
+		fprintf(outputfile, "Begin loglikelihood;\n  loglike = %lf;\n", curLn);
 		return NO_ERROR;
 	}
 
@@ -967,7 +1611,7 @@ int MoveNode (Tree *tree){
 	double rand = rndu();
 	double p[2]={0.3,0.8};
 
-	if(usertree == 2) {p[0] = 0.0; p[1]=0.0;}
+	if(usertree == 3) {p[0] = 0.0; p[1]=0.0;}
     if(usertree == 4) {p[0] = 0.0; p[1] = 0.7;}
     
 	if(rand < p[0]){
@@ -1174,7 +1818,6 @@ void RandomTree (Tree *tree){
 	int i, outgroup, array[NTAXA];
 	double internalbrlens = 0.1, externalbrlens = 1.0;
 
-	//outgroup = gtree[0].nodes[FindOutgroup (&gtree[0])].namenumber;
 	outgroup = 0;
 	RandomVector (array, tree->ntaxa);
 	tree->nodes[array[0]].nson = 0;
@@ -1227,13 +1870,17 @@ int TriplesFreq (char *treefile, int ngene){
 	int i, j, k, stop;
 	int ntriples = sptree.ntaxa*(sptree.ntaxa-1)*(sptree.ntaxa-2)/6;
 	Tree genetree;
-	FILE *fTree;
+	FILE *fin;
 
-	fTree = (FILE*)gfopen(treefile, "r");
+	fin = fopen(treefile, "r");
+	if(!fin){
+		printf("Error: cannot open file %s\n", treefile);
+		return ERROR;
+	}
 	
 	/*find gene tree triples*/
 	for(i=0; i<ngene; i++){
-		if(ReadaTree(fTree, &genetree) == ERROR) {
+		if(ReadaTree(fin, &genetree) == ERROR) {
 			printf("Errors in the gene tree %d; It must be a rooted tree.\n",i+1);
 			return ERROR;
 		}
@@ -1242,9 +1889,9 @@ int TriplesFreq (char *treefile, int ngene){
 		for(j=0; j<genetree.ntaxa; j++){
 			stop = 0;
 			for(k=0; k<totaltaxa; k++){
-				if(!strcmp(genetree.nodes[j].taxaname, taxanames[k])){
+				if(!strcmp(genetree.nodes[j].taxaname, sptable.taxaname[k])){
 					stop = 1; 
-					genetree.nodes[j].namenumber = taxanodenumber[k];
+					genetree.nodes[j].namenumber = sptable.taxanodenumber[k];
 					break;
 				}
 			}
@@ -1267,7 +1914,7 @@ int TriplesFreq (char *treefile, int ngene){
 	}
 
 	/*close file*/
-	fclose(fTree);
+	fclose(fin);
 
 	return NO_ERROR;
 }
@@ -1434,14 +2081,11 @@ int NodeDistance (int node1, int node2, Tree *tree){
 	return NO_ERROR;
 }
 
-
-
-
 int TriplesFreqInatreeCollapse (int **triple, Tree *tree){/*we do NOT need this function. TreeBranchCollapse can collapse short branches*/
 	int i, j, k, w, son0, son1, father, cnode;
 	int offsprings0[NTAXA], offsprings1[NTAXA], offsprings2[NTAXA], n0, n1, n2;
 	int location[2];
-	double brlens, minbrlens = COLLAPSEBRLENS;
+	double brlens, minbrlens = collapseBrlens;
 
 	for(i=tree->ntaxa; i<2*tree->ntaxa-1; i++){
 		if(i != tree->root){
@@ -1837,6 +2481,198 @@ int ReadaTree (FILE *fTree, Tree *tree){
    	return NO_ERROR;
 }
 
+int ReadaTreeString (char *treestring, Tree *tree, bool taxaorder){
+/* 
+   Both names and numbers for species are accepted.  
+   Species names are considered case-sensitive, with trailing blanks ignored.
+*/
+   	int cnode, cfather=-1, taxa=0;  /* current node and father */
+   	int inodeb=0;  /* node number that will have the next branch length */
+   	int i, j, x, level=0, ch=' ', index=0, treestrlength, ntaxa=1, nleft=0, nright=0;
+   	char skips[]="\"\'", str[50];
+   	int nnode;   
+	
+	/*read treestring and find ntaxa*/
+	treestrlength = strlen(treestring);	
+	for(i=0; i<treestrlength; i++){		
+		ch = treestring[i];
+		if(ch == ','){
+			ntaxa++;
+		}
+		if(ch == '('){
+			nleft++;
+		}	
+		if(ch == ')'){
+			nright++;
+		}		
+	}
+
+	/*check if # of ( == # of )*/
+	if(nleft != nright){
+		printf("# of ( != # of )");
+		return ERROR;
+	}
+
+	/*read tree parameters*/
+	tree->ntaxa = ntaxa;
+	tree->numnodes = ntaxa + nright;
+	nnode = tree->ntaxa; 
+
+   	for(i=0; i<tree->numnodes; i++) {
+      		tree->nodes[i].father = -1;
+			tree->nodes[i].brlens = NA;
+      		tree->nodes[i].nson = 0; 
+			tree->nodes[i].sons[0] = -1;
+			tree->nodes[i].sons[1] = -1;
+   	}
+	
+   	for (i=0; i<treestrlength; i++) {
+		ch = treestring[i];	
+		if (!isgraph(ch) || ch==skips[0] || ch==skips[1]){
+			continue;
+		}else if (ch=='('){
+			level++;
+			cnode=nnode++;
+
+			if(nnode > 2*(tree->ntaxa)-1){
+					printf("check tree: perhaps too many '('s");
+					return ERROR;
+			}
+
+			if (cfather>=0) {
+					tree->nodes[cfather].sons[tree->nodes[cfather].nson++] = cnode;
+					tree->nodes[cnode].father=cfather;
+			}else{
+				tree->root=cnode;
+			}          			
+			cfather=cnode;
+		}else if (ch==')') { 
+			level--;  
+			inodeb=cfather; 
+			cfather=tree->nodes[cfather].father; 
+		}else if (ch==':') {
+			index = 0;
+			while(ch != ',' && ch != ')' && ch != ';'){
+				ch = treestring[++i];
+				str[index++] = ch;	
+			}
+			i--;
+			str[--index] = '\0';
+			sscanf(str, "%lf", &tree->nodes[inodeb].brlens);			
+		}else if (ch==',') {
+
+		}else if (ch==';' && level!=0) {
+            printf("; in treefile");
+            return ERROR;
+        }else if (isdigit(ch)){ 
+			index = 0;
+			while(isdigit(treestring[i])){
+				str[index++] = treestring[i];
+				i++;
+			}			
+			inodeb = atoi(str);
+			inodeb--;
+			tree->nodes[inodeb].father=cfather;
+			tree->nodes[cfather].sons[tree->nodes[cfather].nson++]=inodeb;
+		}else if (isalpha(ch)){		
+			index = 0;
+			while(ch != ':' && ch != ',' && ch != ')'){					
+				str[index++] = ch;
+				ch = treestring[++i];
+			}
+			/*add the null character at the end of the string*/
+			str[index] = '\0';
+			/*read taxa name*/
+			if(taxaorder){
+				/*find taxon number*/
+				for(j=0; j<ntaxa; j++){
+					/*global variable sptable.speciesname*/
+					if(!strcmp(str, sptable.speciesname[j])){
+						taxa = j;
+						break;
+					}
+				}
+				if(j == ntaxa){
+					printf("cannot find species %s\n", str);
+					return ERROR;
+				}
+				strcpy(tree->nodes[taxa].taxaname,str);
+				i--;
+				tree->nodes[taxa].father = cfather;
+				tree->nodes[cfather].sons[tree->nodes[cfather].nson++] = taxa;
+				inodeb = taxa;
+			}else{
+				strcpy(tree->nodes[taxa].taxaname,str);
+				i--;
+				tree->nodes[taxa].father = cfather;
+				tree->nodes[cfather].sons[tree->nodes[cfather].nson++] = taxa;
+				inodeb = taxa;
+				taxa++;
+			}
+		}
+   	}
+
+	/*sort sons for each internal node. This can simplify other calculation if sons are sorted*/
+	for(i=tree->ntaxa; i<nnode; i++){
+		for(level=0; level<tree->nodes[i].nson-1; level++){
+			for(index=level+1; index<tree->nodes[i].nson; index++){
+				if(tree->nodes[i].sons[level]>tree->nodes[i].sons[index]){
+					x = tree->nodes[i].sons[level];
+					tree->nodes[i].sons[level] = tree->nodes[i].sons[index];
+					tree->nodes[i].sons[index] = x;
+				}
+			}
+		}
+	}
+
+	/*check if the tree is rooted*/
+	if(tree->nodes[tree->root].nson == 2){
+		tree->isrooted = 1;
+	}else{
+		tree->isrooted = 0;
+	}
+
+	/*double check on the tree*/
+	if(tree->numnodes != nnode){
+		printf("Errors in ReadaTree\n");
+		return ERROR;
+	};
+
+	if(DEBUG){
+		int j;
+		for(i=0; i<tree->numnodes; i++) {
+			printf("node %d %d %lf", tree->nodes[i].father, tree->nodes[i].nson, tree->nodes[i].brlens);
+			for(j=0; j<tree->nodes[i].nson; j++){
+				printf(" %d ", tree->nodes[i].sons[j]);
+			}
+			printf("\n");
+		}
+		printf("%s %s %d %d\n", tree->nodes[0].taxaname, tree->nodes[1].taxaname, tree->isrooted, tree->root);	
+		PrintTree (tree, tree->root, 1, 1, 0, 0, 1);
+		printf("%s", printString);		
+		return ERROR;
+	}
+
+	
+	if((!tree->isrooted) && (calculatedistance == 0 || calculatedistance == 1)){
+		printf("This gene tree is not a rooted tree!\n");
+		return ERROR;
+	}
+
+	/*create postorder tree traversal*/
+	postorderindex = 0;
+	TreeTraversalPostorder (tree->root, tree);
+
+	/*create preorder tree traversal*/
+	postorderindex = 0;
+	TreeTraversalPreorder (tree->root, tree);
+   
+   	return NO_ERROR;
+}
+
+
+
+
 /*PrinTree prints trees by taxa numbers; inode is the root of the tree*/
 int PrintTree (Tree *tree, int inode, int showName, int showBrlens, int showTheta, int showSupport, int isRooted){
 
@@ -2059,10 +2895,11 @@ void WritePhylipTreeToFile (Tree *tree, int inode, int showBrlens, int showTheta
 	free (tempStr);
 }
 
-int QuartetDistance (char *quartetfile, char *outfile, int ntrees){
+int QuartetDistance (char *treefile, int ntrees){
 	char **treenames, **quartetstring, a, b;
 	int i, j, k, dist=0;
 	long nquartets = sptree.ntaxa*(sptree.ntaxa-1)*(sptree.ntaxa-2)*(sptree.ntaxa-3)/24;
+	char quartetfile[100], outfile[100];
 	FILE *fQuartet, *foutfile;
 
 	/*allocate memory for treenames and quartetstring*/
@@ -2079,11 +2916,14 @@ int QuartetDistance (char *quartetfile, char *outfile, int ntrees){
 	}
 
 	/*read treenames and quartetstring*/
-	fQuartet = (FILE*)gfopen(quartetfile,"r");
-	foutfile = (FILE*)gfopen(outfile,"w");
+	sprintf(quartetfile, "%s_quartet.list", treefile);
+	sprintf(outfile, "%s_quartet.dis", treefile);
+	fQuartet = fopen(quartetfile,"r");
+	foutfile = fopen(outfile,"w");
 
 	for(i=0; i<ntrees; i++){
 		if(fscanf(fQuartet, "%s%s", treenames[i], quartetstring[i]) != 2){
+			printf("Error: cannot read Quartet file %s\n", quartetfile);
 			return ERROR;
 		}
 	}
@@ -2116,15 +2956,17 @@ int QuartetDistance (char *quartetfile, char *outfile, int ntrees){
 	return NO_ERROR;
 }
 
-int QuartetsList (char *treefile, char *outfile, int ntrees){
+int QuartetsList (char *treefile, int ntrees){
 	int **genequartetmatrix, x1, x2, x3;
 	int nquartets = sptree.ntaxa*(sptree.ntaxa-1)*(sptree.ntaxa-2)*(sptree.ntaxa-3)/24;
 	int i, j, k, stop;
 	Tree genetree;
+	char outfile[100];
 	FILE *fTree, *foutfile;
 
-	fTree = (FILE*)gfopen(treefile,"r");
-	foutfile = (FILE*)gfopen(outfile,"w");
+	sprintf(outfile, "%s_quartet.list", treefile);
+	fTree = fopen(treefile,"r");
+	foutfile = fopen(outfile,"w");
 
 	/*allocate memory for genequartetmatrix*/
 	genequartetmatrix = (int**)calloc(nquartets, sizeof(int*));
@@ -2148,9 +2990,9 @@ int QuartetsList (char *treefile, char *outfile, int ntrees){
 		for(j=0; j<genetree.ntaxa; j++){
 			stop = 0;
 			for(k=0; k<totaltaxa; k++){
-				if(!strcmp(genetree.nodes[j].taxaname, taxanames[k])){
+				if(!strcmp(genetree.nodes[j].taxaname, sptable.taxaname[k])){
 					stop = 1; 
-					genetree.nodes[j].namenumber = taxanodenumber[k];
+					genetree.nodes[j].namenumber = sptable.taxanodenumber[k];
 					break;
 				}
 			}
@@ -2198,15 +3040,18 @@ int QuartetsList (char *treefile, char *outfile, int ntrees){
 	return NO_ERROR;
 }
 
-int TriplesList (char *treefile, char *outfile, int ntrees){
+int TriplesList (char *treefile, int ntrees){
 	int **genetriplematrix;
 	int ntriples = sptree.ntaxa*(sptree.ntaxa-1)*(sptree.ntaxa-2)/6;
 	int i, j, k, stop;
 	Tree genetree;
+	char outfile[100];
 	FILE *fTree, *foutfile;
 
-	fTree = (FILE*)gfopen(treefile,"r");
-	foutfile = (FILE*)gfopen(outfile,"w");
+	sprintf(outfile, "%s_triple.list", treefile);
+
+	fTree = fopen(treefile,"r");
+	foutfile = fopen(outfile,"w");
 
 	/*allocate memory for genetriplematrix*/
 	genetriplematrix = (int**)calloc(ntriples, sizeof(int*));
@@ -2226,13 +3071,15 @@ int TriplesList (char *treefile, char *outfile, int ntrees){
 			return ERROR;
 		}
 
+		printf("Reading gene tree %d ... calculating triple distance ... Done\n", i);
+
 		/*find gene tree namenumber*/
 		for(j=0; j<genetree.ntaxa; j++){
 			stop = 0;
 			for(k=0; k<totaltaxa; k++){
-				if(!strcmp(genetree.nodes[j].taxaname, taxanames[k])){
+				if(!strcmp(genetree.nodes[j].taxaname, sptable.taxaname[k])){
 					stop = 1; 
-					genetree.nodes[j].namenumber = taxanodenumber[k];
+					genetree.nodes[j].namenumber = sptable.taxanodenumber[k];
 					break;
 				}
 			}
@@ -2278,10 +3125,11 @@ int TriplesList (char *treefile, char *outfile, int ntrees){
 	return NO_ERROR;
 }
 
-int TripleDistance (char *triplefile, char *outfile, int ntrees){
+int TripleDistance (char *treefile, int ntrees){
 	char **treenames, **triplestring, a, b;
 	int i, j, k, dist=0;
 	long ntriples = sptree.ntaxa*(sptree.ntaxa-1)*(sptree.ntaxa-2)/6;
+	char triplefile[100], outfile[100];
 	FILE *fTriple, *foutfile;
 
 	/*allocate memory for treenames and triplestring*/
@@ -2298,11 +3146,14 @@ int TripleDistance (char *triplefile, char *outfile, int ntrees){
 	}
 
 	/*read treenames and triplestring*/
-	fTriple = (FILE*)gfopen(triplefile,"r");
-	foutfile = (FILE*)gfopen(outfile,"w");
+	sprintf(triplefile, "%s_triple.list", treefile);
+	sprintf(outfile, "%s_triple.dis", treefile);
+	fTriple = fopen(triplefile,"r");
+	foutfile = fopen(outfile,"w");
 
 	for(i=0; i<ntrees; i++){
 		if(fscanf(fTriple, "%s%s", treenames[i], triplestring[i]) != 2){
+			printf("Error: cannot read Triple file %s\n", triplefile);
 			return ERROR;
 		}
 	}
@@ -2389,11 +3240,6 @@ int TriplesFreqInaBinaryRootedtree (int **triple, Tree *tree){/*this function is
 
 	return NO_ERROR;
 }
-
-
-
-
-
 
 
 
