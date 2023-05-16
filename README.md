@@ -1,22 +1,19 @@
 # MP-EST (v3.0): Maximum Pseudo-likelihood Estimation of Species Trees
 This program is free software; you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation; either version 2 of the License, or (at your option) any later version.
 
-MP-EST estimates species trees (topology and branch lengths in coalescent units) from a set of gene trees by maximizing a pseudo-likelihood function. The input data of MP-EST are rooted gene trees. In addition to the gene tree file, a control file must be generated for running MP-EST. The control file contains necessary parameters for running MP-EST.
+MP-EST estimates species trees (topology and branch lengths in coalescent units) from a set of gene trees by maximizing a pseudo-likelihood function. The input data of MP-EST are rooted gene trees. Unlike previous versions, MP-EST3.0 uses the command line interface, i.e., no control file is needed for running MP-EST3.0. 
 
 ## New features in version 3.0
 
-1. The version 3.0 uses the command line interface. No control file is needed.
+1. MP-EST3.0 can build an NJst tree and use it as the initial tree to find the MP-EST tree.
 
-2. The version 3.0 can build an NJst tree and use it as the initial tree to find the MP-EST tree.
+2. The program can convert short branches (<1e-06) to polytomies in the gene trees.
 
-3. The program can convert short branches (<1e-06) to polytomies in the gene trees.
+3. The program can take polytomy gene trees as input to estimate species trees.
 
-4. The program can take polytomy gene trees as input to estimate species trees.
+4. The program can calculate triplet/quartet distances among gene trees
 
-5. The program can calculate triplet/quartet distances among gene trees
-
-6. The program outputs the species tree gene tree concordance scores for each internal node of the MP-EST tree.
-
+5. The program outputs the species tree gene tree concordance scores for each internal node of the MP-EST tree.
 
 ## Compile from source code
 To compile the program from source code, type make and hit return under the directory src.
@@ -44,10 +41,8 @@ Usage: mpest [-i inputfile] [-n #] [-s #] [-u NAME] [-h] [-B|-C|-L|-N|-P|-Q|-T|]
 ## Ouput files
 There are two output files; testgenetree_besttree.tre and testgenetree_output.tre. The trees updated in the algorithm are saved in testgenetree_output.tre, while the mpest tree is saved in testgenetree_besttree.tre. If multiple runs are specified in the control file, testgenetree_besttree.tre contains multiple mpest trees.
 
-
 ## Citation
 Liu, L., L. Yu, S.V. Edwards. A maximum pseudo-likelihood approach for estimating species trees under the coalescent model. BMC Evol. Biol. 2010, 10:302.
-
 
 ## Old versions
 Old versions MP-EST are available at https://github.com/lliu1871/oldversion
