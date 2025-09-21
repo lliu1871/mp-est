@@ -485,8 +485,10 @@ int AllocateMemory (int nspecies){
 }
 
 int ReadParametersFromInputFile (char *inputfile){
-	int c, index, i, j, n;
-	char buffer[LSPNAME], x[LSPNAME];	
+	char line[MAX_STRING_LENGTH];
+	char key[LSPNAME];
+	//char val[LSPNAME];
+	int i;
 	FILE *fin = fopen(inputfile, "r");
 
 	if(!fin){
@@ -495,166 +497,131 @@ int ReadParametersFromInputFile (char *inputfile){
 		return ERROR;
 	}
 
-	while(!feof(fin)){
-		if(fscanf(fin, "%s", buffer) != 1){
-			printf("Error: cannot read gene tree file 1 %s\n", inputfile);
-			return ERROR;
-		}
-		
-		for(char *p=buffer; *p; p++){
-			*p=tolower(*p);
-		} 
+	/* initialize to safe defaults */
+	numGenes = -1;
+	sptree.ntaxa = -1;
+	totaltaxa = -1;
 
-		/*sptree.ntaxa and numGenes*/
-		if(!strcmp(buffer,"dimension")){
-			c=fgetc(fin);
-			while(c != 'n'){
-				c=fgetc(fin);
-			}
-			c=tolower(fgetc(fin));
-			if(c=='t'){
-				while(c != '='){
-					c=fgetc(fin);
-				}
-				if(fscanf(fin,"%d", &sptree.ntaxa) != 1){
-					printf("Error: cannot read gene tree file 2 %s\n", inputfile);
-					return ERROR;;
-				}
-				c=fgetc(fin);
-				while(c != '='){
-					c=fgetc(fin);
-				}
-				
-				if(fscanf(fin,"%d", &numGenes) != 1){
-					printf("Error: cannot read gene tree file 3 %s\n", inputfile);
-					return ERROR;
-				}
-			}else{
-				while(c != '='){
-					c=fgetc(fin);
-				}
-				if(fscanf(fin,"%d", &numGenes) != 1){
-					printf("Error: cannot read gene tree file %s\n", inputfile);
-					return ERROR;;
-				}
-				c=fgetc(fin);
-				while(c != '='){
-					c=fgetc(fin);
-				}
-				if(fscanf(fin,"%d", &sptree.ntaxa) != 1){
-					printf("Error: cannot read gene tree file 4 %s\n", inputfile);
-					return ERROR;;
-				}
-			}
-		}
-		
-		/*sptree.outgroup and treetype*/
-		if(!strcmp(buffer,"format")){
-			c=fgetc(fin);
-			while(!isalpha(c)){
-				c=fgetc(fin);
-			}
-			if(tolower(c)=='t'){
-				while(c != '='){
-					c=fgetc(fin);
-				}
-				if(fscanf(fin,"%s", x) != 1){
-					printf("Error: cannot read gene tree file 5 %s\n", inputfile);
-					return ERROR;;
-				}
-				if(tolower(x[0]) == 'r'){
-					genetreetype = 0;
-				}else{
-					genetreetype = 1;
-				}
-				c = fgetc(fin);
-				while(c != '='){
-					c = fgetc(fin);
-				}
-				while(!isalpha(c)){
-					c = fgetc(fin);
-				}
-				sptree.outgroup[0]=c;
-				index = 1;
-				while(c != ' ' && c != ';' && c != '\t'){
-					c = fgetc(fin);
-					sptree.outgroup[index++] = c;
-				}
-				sptree.outgroup[index-1] = '\0';
-			}else{
-				while(c != '='){
-					c=fgetc(fin);
-				}
-				if(fscanf(fin,"%s", sptree.outgroup) != 1){
-					printf("Error: cannot read gene tree file 6 %s\n", inputfile);
-					return ERROR;
-				}
-				c = fgetc(fin);
-				while(c != '='){
-					c = fgetc(fin);
-				}
-				if(fscanf(fin,"%s", x) != 1){
-					printf("Error: cannot read gene tree file 7 %s\n", inputfile);
-					return ERROR;
-				}
-				if(tolower(x[0]) == 'r'){
-					genetreetype = 0;
-				}else{
-					genetreetype = 1;
-				}
-			}			
-		}
+	/* Phase 1: read header blocks until 'matrix' and 'end;' are reached */
+	while(fgets(line, sizeof(line), fin)){
+		/* extract first token (keyword) in lowercase */
+		if(sscanf(line, "%99s", key) != 1) continue;
+		for(char *p = key; *p; ++p) *p = (char) tolower((unsigned char)*p);
 
-		/*find totaltaxa*/
-		if(!strcmp(buffer,"matrix")){
+		if(strcmp(key, "dimension") == 0){
+			/* Look for ngene= and ntaxa= in the line; if not present, scan following tokens */
+			if(strstr(line, "ngene") || strstr(line, "ntaxa")){
+				/* try to parse both in this line */
+				char *ptr = line;
+				while((ptr = strstr(ptr, "ngene")) != NULL){
+					int valn;
+					if(sscanf(ptr, "ngene=%d", &valn) == 1) numGenes = valn;
+					ptr += 5;
+				}
+				ptr = line;
+				while((ptr = strstr(ptr, "ntaxa")) != NULL){
+					int valn;
+					if(sscanf(ptr, "ntaxa=%d", &valn) == 1) sptree.ntaxa = valn;
+					ptr += 5;
+				}
+			} else {
+				/* read next lines/tokens until we find both */
+				//char buf[256];
+				long savepos = ftell(fin);
+				while(fgets(line, sizeof(line), fin)){
+					if(strstr(line, "ngene") || strstr(line, "ntaxa")){
+						char *ptr = line;
+						while((ptr = strstr(ptr, "ngene")) != NULL){
+							int valn;
+							if(sscanf(ptr, "ngene=%d", &valn) == 1) numGenes = valn;
+							ptr += 5;
+						}
+						ptr = line;
+						while((ptr = strstr(ptr, "ntaxa")) != NULL){
+							int valn;
+							if(sscanf(ptr, "ntaxa=%d", &valn) == 1) sptree.ntaxa = valn;
+							ptr += 5;
+						}
+						break;
+					}
+				}
+				(void)savepos;
+			}
+		} else if(strcmp(key, "format") == 0){
+			/* find tree= (rooted/unrooted) and outgroup=NAME */
+			if(strstr(line, "tree=")){
+				char tmp[64];
+				if(sscanf(line, "%*[^t]tree=%63s", tmp) == 1){
+					for(char *p = tmp; *p; ++p) *p = (char) tolower((unsigned char)*p);
+					if(tmp[0] == 'r') genetreetype = 0; else genetreetype = 1;
+				}
+			}
+			if(strstr(line, "outgroup=")){
+				/* read until semicolon or whitespace; bound to LSPNAME-1 */
+				char *og = strstr(line, "outgroup=");
+				if(og){
+					og += strlen("outgroup=");
+					if(sscanf(og, "%99[^; \t\n]", sptree.outgroup) != 1){
+						/* fallback: try token scan */
+						if(sscanf(line, "%*s outgroup=%99s", sptree.outgroup) != 1){
+							/* leave empty */
+							sptree.outgroup[0] = '\0';
+						}
+					}
+				}
+			}
+		} else if(strcmp(key, "matrix") == 0){
+			/* read species lines: name <count> [list of taxa]
+			   compute totaltaxa */
 			totaltaxa = 0;
-			for(i=0; i<sptree.ntaxa; i++){
-				if(fscanf(fin,"%s %d", x, &n) != 2){
+			for(i = 0; i < sptree.ntaxa; ++i){
+				if(!fgets(line, sizeof(line), fin)){
 					printf("# of species in SPtable != ntaxa in file %s\n", inputfile);
+					fclose(fin);
 					return ERROR;
 				}
-				totaltaxa += n;
-				for(j=0; j<n; j++){
-					if(fscanf(fin,"%s", x) != 1){
-						printf("Errors in SPtable in file %s\n", inputfile);
-						return ERROR;
-					}	
+				/* first token is species name or label, second is integer count */
+				char spname[LSPNAME];
+				int count = 0;
+				if(sscanf(line, "%99s %d", spname, &count) < 2){
+					/* try to skip empty/comment lines */
+					i--; continue;
 				}
-			}			
-		}
-		
-		if(!strcmp(buffer,"end;")){
+				totaltaxa += count;
+			}
+		} else if(strcmp(key, "end;") == 0){
 			break;
 		}
 	}
 
-	while(!feof(fin)){
-		if(fscanf(fin, "%s", buffer) != 1){
-			printf("Error: cannot read gene tree file 1 %s\n", inputfile);
-			return ERROR;
+	/* Phase 2: find trees and count gene trees read */
+	int tree_count = 0;
+	while(fgets(line, sizeof(line), fin)){
+		if(sscanf(line, "%99s", key) != 1) continue;
+		for(char *p = key; *p; ++p) *p = (char) tolower((unsigned char)*p);
+		if(strcmp(key, "end;") == 0) break;
+		if(strcmp(key, "trees;") == 0 || strcmp(key, "trees") == 0 || strcmp(key, "tree") == 0){
+			/* ignore header lines */
+			continue;
 		}
-		
-		for(char *p=buffer; *p; p++){
-			*p=tolower(*p);
-		} 
-
-		if(!strcmp(buffer,"end;")){
-			break;
-		}
-
-		if(!strcmp(buffer,"trees;") || !strcmp(buffer,"trees") || !strcmp(buffer,"tree")){
-			n = 0;
-		}else{
-			n++;
-		}
+		/* any non-empty line that contains '(' is likely a Newick tree line */
+		if(strchr(line, '(') != NULL) tree_count++;
 	}
 
-	if (numGenes > n){
-		printf("There are %d < %d gene trees in the input file %s\n",n, numGenes, inputfile);
+	if(numGenes < 0 || sptree.ntaxa < 0){
+		printf("Error: failed to parse ngene or ntaxa from control file %s\n", inputfile);
+		fclose(fin);
+		return ERROR;
+	}
+
+	if(numGenes > tree_count){
+		printf("There are %d < %d gene trees in the input file %s\n", tree_count, numGenes, inputfile);
+		fclose(fin);
 		return ERROR;
 	}
 
 	fclose(fin);
+
 	return NO_ERROR;
 }
 
@@ -684,11 +651,12 @@ int ReadSPtableFromInputFile (char *inputfile){
 					printf("Errors in sptable in file %s\n", inputfile);
 					return ERROR;
 				}
+				
 				for(j=0; j<n; j++){
 					if(fscanf(fin,"%s", sptable.taxaname[index]) != 1){
 						printf("Errors in sptable in file %s\n", inputfile);
 						return ERROR;
-					}	
+					}
 					/*defines the species number that each taxon belongs to*/ 
 					sptable.taxanodenumber[index++] = i;
 				}
@@ -876,8 +844,8 @@ int GenetreeNodeDistance (char *treefile, double *nodedistance){
 	for(j=0; j<sptree.ntaxa-1; j++){
 		for(k=j+1; k<sptree.ntaxa; k++){
 			nodedistance[index] = distance[index]/muldistcount[index];
-			if(nodedistance[index] >= sptree.ntaxa){
-				printf("nodedistance is greater than sptree.ntaxa\n");
+			if(nodedistance[index] >= totaltaxa){
+				printf("\n nodedistance %f between %d and %d is greater than totaltaxa %d\n", nodedistance[index], j+1, k+1, totaltaxa);
 				return ERROR;
 			}
 			index++;
@@ -1408,7 +1376,7 @@ int LogBinomialP (int n, int x, double p, double *logp){
 
 int Algorithm (int **triple, FILE *besttreefile, FILE *outputfile, int runindex){
 	double oldloglike, diff;
-	int i, round=0, sample = 1000, totalround = MAXROUND, noincreasing=0, accept = 0;
+	int i, round=0, sample = 1000, totalround = MAXROUND, noincreasing=0;
 	Tree oldsptree;
 	time_t starttime, endtime;
 	clock_t start, end;
@@ -1462,7 +1430,6 @@ int Algorithm (int **triple, FILE *besttreefile, FILE *outputfile, int runindex)
 		}else{
 			if(diff > 0)
 				noincreasing = 0;			
-			accept++;
 		}
 		
 		round ++;
