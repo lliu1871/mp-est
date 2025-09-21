@@ -501,12 +501,14 @@ int ReadParametersFromInputFile (char *inputfile){
 	numGenes = -1;
 	sptree.ntaxa = -1;
 	totaltaxa = -1;
+	fprintf(stderr, "[mpest] ReadParametersFromInputFile: initialized parameters\n");
 
 	/* Phase 1: read header blocks until 'matrix' and 'end;' are reached */
 	while(fgets(line, sizeof(line), fin)){
 		/* extract first token (keyword) in lowercase */
 		if(sscanf(line, "%99s", key) != 1) continue;
 		for(char *p = key; *p; ++p) *p = (char) tolower((unsigned char)*p);
+		fprintf(stderr, "[mpest] ReadParametersFromInputFile: processing line: '%s'\n", line);
 
 		if(strcmp(key, "dimension") == 0){
 			/* Look for ngene= and ntaxa= in the line; if not present, scan following tokens */
@@ -518,6 +520,7 @@ int ReadParametersFromInputFile (char *inputfile){
 					if(sscanf(ptr, "ngene=%d", &valn) == 1) numGenes = valn;
 					ptr += 5;
 				}
+				fprintf(stderr, "[mpest] ReadParametersFromInputFile: found ngene=%d\n", numGenes);
 				ptr = line;
 				while((ptr = strstr(ptr, "ntaxa")) != NULL){
 					int valn;
@@ -554,6 +557,7 @@ int ReadParametersFromInputFile (char *inputfile){
 				if(sscanf(line, "%*[^t]tree=%63s", tmp) == 1){
 					for(char *p = tmp; *p; ++p) *p = (char) tolower((unsigned char)*p);
 					if(tmp[0] == 'r') genetreetype = 0; else genetreetype = 1;
+					fprintf(stderr, "[mpest] ReadParametersFromInputFile: found tree type: %s\n", tmp);
 				}
 			}
 			if(strstr(line, "outgroup=")){
@@ -613,6 +617,7 @@ int ReadParametersFromInputFile (char *inputfile){
 		fclose(fin);
 		return ERROR;
 	}
+	fprintf(stderr, "[mpest] ReadParametersFromInputFile: parsed ngene=%d, ntaxa=%d\n", numGenes, sptree.ntaxa);
 
 	if(numGenes > tree_count){
 		printf("There are %d < %d gene trees in the input file %s\n", tree_count, numGenes, inputfile);
