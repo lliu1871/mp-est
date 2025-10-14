@@ -23,7 +23,7 @@ MP-EST estimates species trees (topology and branch lengths in coalescent units)
 
 5. MP-EST3.0 outputs species-tree-gene-tree concordance scores for each internal node of the MP-EST tree.
 
-# Installation
+## Installation
 
 There are two ways to install MP-EST:
 
