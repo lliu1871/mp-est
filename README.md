@@ -27,7 +27,7 @@ MP-EST estimates species trees (topology and branch lengths in coalescent units)
 
 There are two ways to install MP-EST:
 
-## 1. Install from [bioconda](https://bioconda.github.io/recipes/mp-est/README.html)
+### 1. Install from [bioconda](https://bioconda.github.io/recipes/mp-est/README.html)
 
 MP-EST is available as a package on bioconda. With [conda](https://docs.conda.io/projects/conda/en/latest/user-guide/install/index.html) or [mamba](https://mamba.readthedocs.io/en/latest/installation.html) already installed and your [channels set up for bioconda](https://bioconda.github.io/#usage), simply type the following to install:
 
@@ -41,17 +41,17 @@ This will create a new environment and activate it and then install mp-est from 
 
 If you use mamba instead of conda, just replace `conda` with `mamba` above.
 
-## 2. Compile from source code
+### 2. Compile from source code
 
 To compile the program from source code, type make and hit return under the directory src.
 
-# Usage
+## Usage
 
-## Run the program
+### Run the program
 
 ./mpest -i testgenetree 
 
-## Help
+### Help
 
 ./mpest -h
 
@@ -69,7 +69,7 @@ Usage: mpest [-i inputfile] [-n #] [-s #] [-u NAME] [-h] [-B|-C|-L|-N|-P|-Q|-T|]
   -Q: calculate pairwise quartet distances among gene trees. Polytomy (unrooted or rooted) gene trees are allowed.\
   -T: calculate pairwise triple distances of gene trees. Polytomy rooted gene trees are allowed.\
 
-## Ouput files
+### Ouput files
 
 There are two output files; testgenetree_besttree.tre and testgenetree_output.tre. The trees updated in the algorithm are saved in testgenetree_output.tre, while the mpest tree is saved in testgenetree_besttree.tre. If multiple runs are specified in the control file, testgenetree_besttree.tre contains multiple mpest trees.
 
